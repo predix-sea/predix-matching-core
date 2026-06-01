@@ -1,0 +1,45 @@
+# Build artifacts
+target/
+core/build/
+core/cmake-build-*/
+service/target/
+*.class
+*.jar
+*.war
+*.ear
+
+# C++ / CMake
+core/out/
+*.o
+*.a
+*.so
+*.dylib
+compile_commands.json
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.classpath
+.project
+.settings/
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+
+# OS and logs
+.DS_Store
+Thumbs.db
+*.log
+*.tmp
+*.swp
+
+# Test / coverage
+coverage/
+*.exec
+.jacoco/
+
+# Docker local overrides
+docker-compose.override.yml

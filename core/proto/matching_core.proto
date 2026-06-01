@@ -1,0 +1,106 @@
+syntax = "proto3";
+
+package predix.matching;
+
+option java_package = "com.predix.matching.grpc";
+option java_multiple_files = true;
+option cc_enable_arenas = true;
+
+enum Side {
+  SIDE_UNSPECIFIED = 0;
+  SIDE_BUY = 1;
+  SIDE_SELL = 2;
+}
+
+enum OrderType {
+  ORDER_TYPE_UNSPECIFIED = 0;
+  ORDER_TYPE_LIMIT = 1;
+  ORDER_TYPE_MARKET = 2;
+}
+
+message BookOrderInput {
+  string order_id = 1;
+  string user_id = 2;
+  Side side = 3;
+  OrderType order_type = 4;
+  int64 price = 5;                // fixed-point scale 10^8; 0 for market
+  int64 remaining_quantity = 6;   // fixed-point scale 10^8
+  int64 created_at_ms = 7;
+  int64 sequence = 8;
+}
+
+message SubmitOrderRequest {
+  string market_id = 1;
+  string outcome_id = 2;
+  BookOrderInput order = 3;
+}
+
+message TradeFill {
+  string maker_order_id = 1;
+  string maker_user_id = 2;
+  string taker_order_id = 3;
+  string taker_user_id = 4;
+  int64 price = 5;
+  int64 quantity = 6;
+  bool buyer_is_taker = 7;
+}
+
+message SubmitOrderResponse {
+  BookOrderInput incoming_order = 1;
+  repeated TradeFill fills = 2;
+  bool fully_filled = 3;
+  bool rejected = 4;
+  string reject_reason = 5;
+}
+
+message CancelOrderRequest {
+  string market_id = 1;
+  string outcome_id = 2;
+  string order_id = 3;
+}
+
+message CancelOrderResponse {
+  bool removed = 1;
+}
+
+message GetDepthRequest {
+  string market_id = 1;
+  string outcome_id = 2;
+  int32 levels = 3;
+}
+
+message DepthLevel {
+  Side side = 1;
+  int64 price = 2;
+  int64 quantity = 3;
+}
+
+message GetDepthResponse {
+  repeated DepthLevel levels = 1;
+}
+
+message WarmupBookRequest {
+  string market_id = 1;
+  string outcome_id = 2;
+  repeated BookOrderInput orders = 3;
+}
+
+message WarmupBookResponse {
+  int32 loaded_count = 1;
+}
+
+message HealthRequest {}
+
+message HealthResponse {
+  bool healthy = 1;
+  string version = 2;
+  int32 shard_count = 3;
+}
+
+service MatchingCore {
+  rpc SubmitOrder(SubmitOrderRequest) returns (SubmitOrderResponse);
+  rpc CancelOrder(CancelOrderRequest) returns (CancelOrderResponse);
+  rpc GetDepth(GetDepthRequest) returns (GetDepthResponse);
+  rpc WarmupBook(WarmupBookRequest) returns (WarmupBookResponse);
+  rpc Health(HealthRequest) returns (HealthResponse);
+}

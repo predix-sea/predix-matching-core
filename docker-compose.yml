@@ -1,0 +1,90 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: predix_matching
+      POSTGRES_USER: predix
+      POSTGRES_PASSWORD: predix
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U predix -d predix_matching"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    environment:
+      RABBITMQ_DEFAULT_USER: predix
+      RABBITMQ_DEFAULT_PASS: predix
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  matching-core:
+    build: ./core
+    ports:
+      - "50051:50051"
+    volumes:
+      - waldata:/var/lib/predix
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep matching_core || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  matching-service:
+    build: ./service
+    ports:
+      - "8082:8082"
+    environment:
+      SERVER_PORT: 8082
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: predix_matching
+      DB_USER: predix
+      DB_PASSWORD: predix
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: predix
+      RABBITMQ_PASSWORD: predix
+      MATCHING_CORE_GRPC_ENABLED: "true"
+      MATCHING_CORE_HOST: matching-core
+      MATCHING_CORE_PORT: 50051
+      MARKET_SCHEMA_URL: http://host.docker.internal:8081
+      CTF_GATEWAY_URL: http://host.docker.internal:8083
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      matching-core:
+        condition: service_started
+
+volumes:
+  pgdata:
+  waldata:

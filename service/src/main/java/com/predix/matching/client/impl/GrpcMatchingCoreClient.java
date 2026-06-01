@@ -1,0 +1,164 @@
+package com.predix.matching.client.impl;
+
+import com.predix.matching.client.MatchingCoreClient;
+import com.predix.matching.client.dto.CoreMatchResult;
+import com.predix.matching.client.grpc.GrpcDecimalConverter;
+import com.predix.matching.domain.entity.OrderEntity;
+import com.predix.matching.exception.BusinessException;
+import com.predix.matching.exception.ErrorCode;
+import com.predix.matching.grpc.BookOrderInput;
+import com.predix.matching.grpc.CancelOrderRequest;
+import com.predix.matching.grpc.GetDepthRequest;
+import com.predix.matching.grpc.HealthRequest;
+import com.predix.matching.grpc.MatchingCoreGrpc;
+import com.predix.matching.grpc.SubmitOrderRequest;
+import com.predix.matching.grpc.SubmitOrderResponse;
+import com.predix.matching.grpc.WarmupBookRequest;
+import io.grpc.StatusRuntimeException;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.context.annotation.Primary;
+import org.springframework.stereotype.Component;
+
+import java.util.List;
+import java.util.UUID;
+import java.util.stream.Collectors;
+
+@Slf4j
+@Component
+@Primary
+@ConditionalOnProperty(name = "predix.matching-core.grpc.enabled", havingValue = "true")
+@RequiredArgsConstructor
+public class GrpcMatchingCoreClient implements MatchingCoreClient {
+
+    private final MatchingCoreGrpc.MatchingCoreBlockingStub stub;
+    private final LocalMatchingCoreClient fallback;
+
+    @Override
+    public CoreMatchResult submitOrder(OrderEntity order) {
+        try {
+            BookOrderInput bookOrder = toBookOrderInput(order);
+            SubmitOrderResponse response = stub.submitOrder(SubmitOrderRequest.newBuilder()
+                    .setMarketId(order.getMarketId())
+                    .setOutcomeId(order.getOutcomeId())
+                    .setOrder(bookOrder)
+                    .build());
+            if (response.getRejected()) {
+                throw new BusinessException(ErrorCode.ORDER_INSUFFICIENT_LIQUIDITY, response.getRejectReason());
+            }
+            return toCoreResult(order.getId(), response);
+        } catch (StatusRuntimeException e) {
+            log.warn("gRPC submitOrder failed, falling back to local core: {}", e.getStatus());
+            return fallback.submitOrder(order);
+        }
+    }
+
+    @Override
+    public boolean cancelOrder(OrderEntity order) {
+        try {
+            return stub.cancelOrder(CancelOrderRequest.newBuilder()
+                    .setMarketId(order.getMarketId())
+                    .setOutcomeId(order.getOutcomeId())
+                    .setOrderId(order.getId().toString())
+                    .build()).getRemoved();
+        } catch (StatusRuntimeException e) {
+            log.warn("gRPC cancelOrder failed, falling back to local core: {}", e.getStatus());
+            return fallback.cancelOrder(order);
+        }
+    }
+
+    @Override
+    public List<CoreMatchResult.CoreDepthLevel> getDepth(String marketId, String outcomeId, int levels) {
+        try {
+            return stub.getDepth(GetDepthRequest.newBuilder()
+                    .setMarketId(marketId)
+                    .setOutcomeId(outcomeId)
+                    .setLevels(levels)
+                    .build()).getLevelsList().stream()
+                    .map(level -> CoreMatchResult.CoreDepthLevel.builder()
+                            .side(GrpcDecimalConverter.fromGrpcSide(level.getSide()))
+                            .price(GrpcDecimalConverter.fromRaw(level.getPrice()))
+                            .quantity(GrpcDecimalConverter.fromRaw(level.getQuantity()))
+                            .build())
+                    .collect(Collectors.toList());
+        } catch (StatusRuntimeException e) {
+            log.warn("gRPC getDepth failed, falling back to local core: {}", e.getStatus());
+            return fallback.getDepth(marketId, outcomeId, levels);
+        }
+    }
+
+    @Override
+    public int warmupBook(String marketId, String outcomeId, List<CoreMatchResult.CoreBookOrder> orders) {
+        try {
+            WarmupBookRequest.Builder builder = WarmupBookRequest.newBuilder()
+                    .setMarketId(marketId)
+                    .setOutcomeId(outcomeId);
+            for (CoreMatchResult.CoreBookOrder order : orders) {
+                builder.addOrders(toBookOrderInput(order));
+            }
+            return stub.warmupBook(builder.build()).getLoadedCount();
+        } catch (StatusRuntimeException e) {
+            log.warn("gRPC warmupBook failed, falling back to local core: {}", e.getStatus());
+            return fallback.warmupBook(marketId, outcomeId, orders);
+        }
+    }
+
+    @Override
+    public boolean healthCheck() {
+        try {
+            return stub.health(HealthRequest.getDefaultInstance()).getHealthy();
+        } catch (StatusRuntimeException e) {
+            return fallback.healthCheck();
+        }
+    }
+
+    private CoreMatchResult toCoreResult(UUID orderId, SubmitOrderResponse response) {
+        List<CoreMatchResult.CoreTradeFill> fills = response.getFillsList().stream()
+                .map(fill -> CoreMatchResult.CoreTradeFill.builder()
+                        .makerOrderId(UUID.fromString(fill.getMakerOrderId()))
+                        .makerUserId(fill.getMakerUserId())
+                        .takerOrderId(UUID.fromString(fill.getTakerOrderId()))
+                        .takerUserId(fill.getTakerUserId())
+                        .price(GrpcDecimalConverter.fromRaw(fill.getPrice()))
+                        .quantity(GrpcDecimalConverter.fromRaw(fill.getQuantity()))
+                        .buyerIsTaker(fill.getBuyerIsTaker())
+                        .build())
+                .collect(Collectors.toList());
+
+        return CoreMatchResult.builder()
+                .orderId(orderId)
+                .remainingQuantity(GrpcDecimalConverter.fromRaw(response.getIncomingOrder().getRemainingQuantity()))
+                .fullyFilled(response.getFullyFilled())
+                .rejected(response.getRejected())
+                .rejectReason(response.getRejectReason())
+                .fills(fills)
+                .build();
+    }
+
+    private BookOrderInput toBookOrderInput(OrderEntity order) {
+        return BookOrderInput.newBuilder()
+                .setOrderId(order.getId().toString())
+                .setUserId(order.getUserId())
+                .setSide(GrpcDecimalConverter.toGrpcSide(order.getSide()))
+                .setOrderType(GrpcDecimalConverter.toGrpcOrderType(order.getOrderType()))
+                .setPrice(GrpcDecimalConverter.toRaw(order.getPrice()))
+                .setRemainingQuantity(GrpcDecimalConverter.toRaw(order.getRemainingQuantity()))
+                .setCreatedAtMs(order.getCreatedAt() != null ? order.getCreatedAt().toEpochMilli() : System.currentTimeMillis())
+                .setSequence(0)
+                .build();
+    }
+
+    private BookOrderInput toBookOrderInput(CoreMatchResult.CoreBookOrder order) {
+        return BookOrderInput.newBuilder()
+                .setOrderId(order.getId().toString())
+                .setUserId(order.getUserId())
+                .setSide(GrpcDecimalConverter.toGrpcSide(order.getSide()))
+                .setOrderType(GrpcDecimalConverter.toGrpcOrderType(order.getOrderType()))
+                .setPrice(GrpcDecimalConverter.toRaw(order.getPrice()))
+                .setRemainingQuantity(GrpcDecimalConverter.toRaw(order.getRemainingQuantity()))
+                .setCreatedAtMs(order.getCreatedAtEpochMs())
+                .setSequence(order.getSequence())
+                .build();
+    }
+}

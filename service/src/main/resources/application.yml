@@ -1,0 +1,99 @@
+spring:
+  application:
+    name: predix-matching-core
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+    time-zone: UTC
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:predix_matching}
+    username: ${DB_USER:predix}
+    password: ${DB_PASSWORD:predix}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+    show-sql: false
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USER:predix}
+    password: ${RABBITMQ_PASSWORD:predix}
+    virtual-host: ${RABBITMQ_VHOST:/}
+
+server:
+  port: ${SERVER_PORT:8082}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      show-details: when_authorized
+  metrics:
+    tags:
+      application: ${spring.application.name}
+
+predix:
+  matching:
+    price-min: "0.01"
+    price-max: "0.99"
+    max-retry-count: 5
+    retry-base-delay-ms: 1000
+  matching-core:
+    grpc:
+      enabled: ${MATCHING_CORE_GRPC_ENABLED:false}
+      host: ${MATCHING_CORE_HOST:localhost}
+      port: ${MATCHING_CORE_PORT:50051}
+  clients:
+    market-schema:
+      base-url: ${MARKET_SCHEMA_URL:http://localhost:8081}
+      connect-timeout-ms: 3000
+      read-timeout-ms: 5000
+      max-retries: 2
+    ctf-gateway:
+      base-url: ${CTF_GATEWAY_URL:http://localhost:8083}
+      connect-timeout-ms: 3000
+      read-timeout-ms: 10000
+      max-retries: 2
+    indexer:
+      base-url: ${INDEXER_URL:http://localhost:8084}
+      connect-timeout-ms: 3000
+      read-timeout-ms: 5000
+      enabled: ${INDEXER_ENABLED:false}
+  mq:
+    exchange: predix.matching.exchange
+    events-queue: predix.matching.events
+    execution-queue: predix.matching.execution
+    dlq: predix.matching.dlq
+    max-retry-attempts: 5
+  security:
+    trust-bff-user-header: true
+    bff-user-id-header: X-BFF-User-Id
+    signature-header: X-BFF-Signature
+
+springdoc:
+  api-docs:
+    path: /api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+
+logging:
+  level:
+    com.predix.matching: INFO
+    org.springframework.amqp: WARN
