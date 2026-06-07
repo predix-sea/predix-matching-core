@@ -48,10 +48,11 @@ services:
     volumes:
       - waldata:/var/lib/predix
     healthcheck:
-      test: ["CMD-SHELL", "pgrep matching_core || exit 1"]
-      interval: 10s
+      test: ["CMD-SHELL", "pgrep matching_core >/dev/null && nc -z 127.0.0.1 50051"]
+      interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 12
+      start_period: 10s
 
   matching-service:
     build: ./service
@@ -83,7 +84,7 @@ services:
       rabbitmq:
         condition: service_healthy
       matching-core:
-        condition: service_started
+        condition: service_healthy
 
 volumes:
   pgdata:

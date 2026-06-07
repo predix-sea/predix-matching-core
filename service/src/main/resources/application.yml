@@ -57,6 +57,7 @@ predix:
     retry-base-delay-ms: 1000
   matching-core:
     grpc:
+      # false: fail-fast 503 unless profile=h2 (tests). Production/Docker: set MATCHING_CORE_GRPC_ENABLED=true.
       enabled: ${MATCHING_CORE_GRPC_ENABLED:false}
       host: ${MATCHING_CORE_HOST:localhost}
       port: ${MATCHING_CORE_PORT:50051}
