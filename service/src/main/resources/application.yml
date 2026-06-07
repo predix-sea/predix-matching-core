@@ -60,6 +60,12 @@ predix:
       enabled: ${MATCHING_CORE_GRPC_ENABLED:false}
       host: ${MATCHING_CORE_HOST:localhost}
       port: ${MATCHING_CORE_PORT:50051}
+      deadline-ms: ${MATCHING_CORE_GRPC_DEADLINE_MS:5000}
+    health-check-ms: ${MATCHING_CORE_HEALTH_CHECK_MS:30000}
+  reconciliation:
+    enabled: ${MATCHING_RECONCILIATION_ENABLED:true}
+    interval-ms: ${MATCHING_RECONCILIATION_INTERVAL_MS:300000}
+    depth-levels: ${MATCHING_RECONCILIATION_DEPTH_LEVELS:20}
   clients:
     market-schema:
       base-url: ${MARKET_SCHEMA_URL:http://localhost:8081}

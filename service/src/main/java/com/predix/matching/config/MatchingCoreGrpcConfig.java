@@ -9,6 +9,8 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+import java.util.concurrent.TimeUnit;
+
 @Slf4j
 @Configuration
 @ConditionalOnProperty(name = "predix.matching-core.grpc.enabled", havingValue = "true")
@@ -24,7 +26,10 @@ public class MatchingCoreGrpcConfig {
     }
 
     @Bean
-    public MatchingCoreGrpc.MatchingCoreBlockingStub matchingCoreStub(ManagedChannel matchingCoreChannel) {
-        return MatchingCoreGrpc.newBlockingStub(matchingCoreChannel);
+    public MatchingCoreGrpc.MatchingCoreBlockingStub matchingCoreStub(
+            ManagedChannel matchingCoreChannel, PredixProperties properties) {
+        long deadlineMs = properties.getMatchingCore().getGrpc().getDeadlineMs();
+        return MatchingCoreGrpc.newBlockingStub(matchingCoreChannel)
+                .withDeadlineAfter(deadlineMs, TimeUnit.MILLISECONDS);
     }
 }

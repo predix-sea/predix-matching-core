@@ -17,7 +17,8 @@ public enum ErrorCode {
     ORDER_INVALID_TRANSITION("ORDER_INVALID_TRANSITION", "Invalid order status transition", HttpStatus.CONFLICT),
     EXECUTION_TASK_RETRY_EXCEEDED("EXECUTION_TASK_RETRY_EXCEEDED", "Execution task retry limit exceeded", HttpStatus.CONFLICT),
     EXECUTION_TASK_NOT_FOUND("EXECUTION_TASK_NOT_FOUND", "Execution task not found", HttpStatus.NOT_FOUND),
-    MARKET_SCHEMA_UNAVAILABLE("MARKET_SCHEMA_UNAVAILABLE", "Market schema service unavailable", HttpStatus.SERVICE_UNAVAILABLE);
+    MARKET_SCHEMA_UNAVAILABLE("MARKET_SCHEMA_UNAVAILABLE", "Market schema service unavailable", HttpStatus.SERVICE_UNAVAILABLE),
+    MATCHING_CORE_UNAVAILABLE("MATCHING_CORE_UNAVAILABLE", "Matching core unavailable", HttpStatus.SERVICE_UNAVAILABLE);
 
     private final String code;
     private final String defaultMessage;

@@ -1,3 +1,4 @@
 shard_count: 4
 listen_port: 50051
 wal_path: /var/lib/predix/matching.wal
+wal_flush_each_append: false

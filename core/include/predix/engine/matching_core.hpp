@@ -24,22 +24,42 @@ public:
                             BookOrder order) {
         Shard& shard = shardFor(market_id, outcome_id);
         std::lock_guard lock(shard.mutex);
+        auto& book = shard.registry.getOrCreate(market_id, outcome_id);
+
+        if (const auto cached = book.findSubmissionResult(order.id)) {
+            return *cached;
+        }
+        if (book.hasRestingOrder(order.id)) {
+            return book.restingOrderResult(order.id);
+        }
+
         if (wal_) {
             wal_->appendSubmit(market_id, outcome_id, order);
         }
-        auto& book = shard.registry.getOrCreate(market_id, outcome_id);
-        return book.match(std::move(order));
+        MatchResult result = book.match(std::move(order));
+        book.recordSubmissionResult(result);
+        return result;
     }
 
     bool cancelOrder(const std::string& market_id, const std::string& outcome_id,
                      const std::string& order_id) {
         Shard& shard = shardFor(market_id, outcome_id);
         std::lock_guard lock(shard.mutex);
+        OrderBook* book = shard.registry.get(market_id, outcome_id);
+        if (book == nullptr) {
+            return false;
+        }
+        if (!book->hasRestingOrder(order_id)) {
+            return false;
+        }
         if (wal_) {
             wal_->appendCancel(market_id, outcome_id, order_id);
         }
-        OrderBook* book = shard.registry.get(market_id, outcome_id);
-        return book != nullptr && book->removeFromBook(order_id);
+        const bool removed = book->removeFromBook(order_id);
+        if (removed) {
+            book->forgetSubmissionResult(order_id);
+        }
+        return removed;
     }
 
     std::vector<DepthLevel> getDepth(const std::string& market_id, const std::string& outcome_id,
@@ -53,15 +73,26 @@ public:
         return book->getDepth(levels);
     }
 
-    int warmupBook(const std::string& market_id, const std::string& outcome_id,
-                   std::vector<BookOrder> orders) {
+    bool resetBook(const std::string& market_id, const std::string& outcome_id) {
         Shard& shard = shardFor(market_id, outcome_id);
         std::lock_guard lock(shard.mutex);
+        return shard.registry.reset(market_id, outcome_id);
+    }
+
+    int warmupBook(const std::string& market_id, const std::string& outcome_id,
+                   std::vector<BookOrder> orders, bool replace_existing = true) {
+        Shard& shard = shardFor(market_id, outcome_id);
+        std::lock_guard lock(shard.mutex);
+        if (replace_existing) {
+            shard.registry.reset(market_id, outcome_id);
+        }
         auto& book = shard.registry.getOrCreate(market_id, outcome_id);
         int count = 0;
         for (auto& order : orders) {
-            book.addToBook(std::move(order));
-            ++count;
+            if (!book.hasRestingOrder(order.id)) {
+                book.addToBook(std::move(order));
+                ++count;
+            }
         }
         return count;
     }

@@ -11,6 +11,7 @@ import com.predix.matching.grpc.CancelOrderRequest;
 import com.predix.matching.grpc.GetDepthRequest;
 import com.predix.matching.grpc.HealthRequest;
 import com.predix.matching.grpc.MatchingCoreGrpc;
+import com.predix.matching.grpc.ResetBookRequest;
 import com.predix.matching.grpc.SubmitOrderRequest;
 import com.predix.matching.grpc.SubmitOrderResponse;
 import com.predix.matching.grpc.WarmupBookRequest;
@@ -33,7 +34,6 @@ import java.util.stream.Collectors;
 public class GrpcMatchingCoreClient implements MatchingCoreClient {
 
     private final MatchingCoreGrpc.MatchingCoreBlockingStub stub;
-    private final LocalMatchingCoreClient fallback;
 
     @Override
     public CoreMatchResult submitOrder(OrderEntity order) {
@@ -49,8 +49,7 @@ public class GrpcMatchingCoreClient implements MatchingCoreClient {
             }
             return toCoreResult(order.getId(), response);
         } catch (StatusRuntimeException e) {
-            log.warn("gRPC submitOrder failed, falling back to local core: {}", e.getStatus());
-            return fallback.submitOrder(order);
+            throw grpcUnavailable("submitOrder", e);
         }
     }
 
@@ -63,8 +62,7 @@ public class GrpcMatchingCoreClient implements MatchingCoreClient {
                     .setOrderId(order.getId().toString())
                     .build()).getRemoved();
         } catch (StatusRuntimeException e) {
-            log.warn("gRPC cancelOrder failed, falling back to local core: {}", e.getStatus());
-            return fallback.cancelOrder(order);
+            throw grpcUnavailable("cancelOrder", e);
         }
     }
 
@@ -83,24 +81,36 @@ public class GrpcMatchingCoreClient implements MatchingCoreClient {
                             .build())
                     .collect(Collectors.toList());
         } catch (StatusRuntimeException e) {
-            log.warn("gRPC getDepth failed, falling back to local core: {}", e.getStatus());
-            return fallback.getDepth(marketId, outcomeId, levels);
+            throw grpcUnavailable("getDepth", e);
         }
     }
 
     @Override
-    public int warmupBook(String marketId, String outcomeId, List<CoreMatchResult.CoreBookOrder> orders) {
+    public int warmupBook(String marketId, String outcomeId, List<CoreMatchResult.CoreBookOrder> orders,
+                          boolean replaceExisting) {
         try {
             WarmupBookRequest.Builder builder = WarmupBookRequest.newBuilder()
                     .setMarketId(marketId)
-                    .setOutcomeId(outcomeId);
+                    .setOutcomeId(outcomeId)
+                    .setReplaceExisting(replaceExisting);
             for (CoreMatchResult.CoreBookOrder order : orders) {
                 builder.addOrders(toBookOrderInput(order));
             }
             return stub.warmupBook(builder.build()).getLoadedCount();
         } catch (StatusRuntimeException e) {
-            log.warn("gRPC warmupBook failed, falling back to local core: {}", e.getStatus());
-            return fallback.warmupBook(marketId, outcomeId, orders);
+            throw grpcUnavailable("warmupBook", e);
+        }
+    }
+
+    @Override
+    public boolean resetBook(String marketId, String outcomeId) {
+        try {
+            return stub.resetBook(ResetBookRequest.newBuilder()
+                    .setMarketId(marketId)
+                    .setOutcomeId(outcomeId)
+                    .build()).getReset();
+        } catch (StatusRuntimeException e) {
+            throw grpcUnavailable("resetBook", e);
         }
     }
 
@@ -109,8 +119,14 @@ public class GrpcMatchingCoreClient implements MatchingCoreClient {
         try {
             return stub.health(HealthRequest.getDefaultInstance()).getHealthy();
         } catch (StatusRuntimeException e) {
-            return fallback.healthCheck();
+            log.warn("gRPC healthCheck failed: {}", e.getStatus());
+            return false;
         }
+    }
+
+    private BusinessException grpcUnavailable(String operation, StatusRuntimeException e) {
+        log.error("gRPC {} failed: {}", operation, e.getStatus());
+        return new BusinessException(ErrorCode.MATCHING_CORE_UNAVAILABLE, e.getStatus().getDescription());
     }
 
     private CoreMatchResult toCoreResult(UUID orderId, SubmitOrderResponse response) {

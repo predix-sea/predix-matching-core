@@ -13,6 +13,7 @@ public class PredixProperties {
 
     private Matching matching = new Matching();
     private MatchingCoreConfig matchingCore = new MatchingCoreConfig();
+    private Reconciliation reconciliation = new Reconciliation();
     private Clients clients = new Clients();
     private Mq mq = new Mq();
     private Security security = new Security();
@@ -26,7 +27,15 @@ public class PredixProperties {
             private boolean enabled = false;
             private String host = "localhost";
             private int port = 50051;
+            private long deadlineMs = 5000;
         }
+    }
+
+    @Data
+    public static class Reconciliation {
+        private boolean enabled = true;
+        private long intervalMs = 300000;
+        private int depthLevels = 20;
     }
 
     @Data

@@ -47,6 +47,8 @@ predix::server::CoreConfig loadConfig(const std::string& path) {
             config.shard_count = static_cast<std::size_t>(std::stoul(value));
         } else if (key == "wal_path") {
             config.wal_path = value;
+        } else if (key == "wal_flush_each_append") {
+            config.wal_flush_each_append = value == "true" || value == "1";
         }
     }
 
@@ -65,7 +67,7 @@ int main(int argc, char** argv) {
     }
 
     const predix::server::CoreConfig config = loadConfig(config_path);
-    auto wal = std::make_shared<predix::wal::WalWriter>(config.wal_path);
+    auto wal = std::make_shared<predix::wal::WalWriter>(config.wal_path, config.wal_flush_each_append);
     auto core = std::make_shared<predix::engine::MatchingCore>(config.shard_count, wal);
 
     predix::server::GrpcServer server(config, core);

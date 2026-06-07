@@ -3,8 +3,8 @@
 #include "predix/engine/price_level.hpp"
 #include "predix/engine/types.hpp"
 
-#include <atomic>
 #include <map>
+#include <optional>
 #include <string>
 #include <unordered_map>
 #include <utility>
@@ -23,6 +23,44 @@ public:
     const std::string& marketId() const { return market_id_; }
     const std::string& outcomeId() const { return outcome_id_; }
 
+    bool hasRestingOrder(const std::string& order_id) const {
+        return order_index_.find(order_id) != order_index_.end();
+    }
+
+    std::optional<MatchResult> findSubmissionResult(const std::string& order_id) const {
+        const auto it = submission_cache_.find(order_id);
+        if (it == submission_cache_.end()) {
+            return std::nullopt;
+        }
+        return it->second;
+    }
+
+    MatchResult restingOrderResult(const std::string& order_id) const {
+        const auto it = order_index_.find(order_id);
+        if (it == order_index_.end()) {
+            return MatchResult{};
+        }
+        return MatchResult{it->second, {}, false, false, {}};
+    }
+
+    void recordSubmissionResult(const MatchResult& result) {
+        if (!result.incoming_order.id.empty()) {
+            submission_cache_[result.incoming_order.id] = result;
+        }
+    }
+
+    void forgetSubmissionResult(const std::string& order_id) {
+        submission_cache_.erase(order_id);
+    }
+
+    void clear() {
+        bids_.clear();
+        asks_.clear();
+        order_index_.clear();
+        submission_cache_.clear();
+        sequence_ = 0;
+    }
+
     MatchResult match(BookOrder incoming) {
         if (incoming.side == Side::BUY) {
             return matchAgainst(incoming, asks_);
@@ -32,6 +70,9 @@ public:
 
     void addToBook(BookOrder order) {
         if (!order.remaining_quantity.isPositive()) {
+            return;
+        }
+        if (hasRestingOrder(order.id)) {
             return;
         }
         BookOrder with_seq = std::move(order);
@@ -187,6 +228,7 @@ private:
     AskBook asks_;
     int64_t sequence_{0};
     std::unordered_map<std::string, BookOrder> order_index_;
+    std::unordered_map<std::string, MatchResult> submission_cache_;
 };
 
 }  // namespace predix::engine
