@@ -54,13 +54,21 @@ public class IdempotencyService {
             throw new IllegalStateException("Failed to serialize idempotency response", e);
         }
         Instant expiresAt = Instant.now().plus(TTL);
-        IdempotencyRecordEntity record = IdempotencyRecordEntity.builder()
-                .idempotencyKey(key)
-                .resourceType(resourceType)
-                .resourceId(resourceId)
-                .responseBody(body)
-                .expiresAt(expiresAt)
-                .build();
+        IdempotencyRecordEntity record = repository.findByIdempotencyKey(key)
+                .map(existing -> {
+                    existing.setResourceType(resourceType);
+                    existing.setResourceId(resourceId);
+                    existing.setResponseBody(body);
+                    existing.setExpiresAt(expiresAt);
+                    return existing;
+                })
+                .orElseGet(() -> IdempotencyRecordEntity.builder()
+                        .idempotencyKey(key)
+                        .resourceType(resourceType)
+                        .resourceId(resourceId)
+                        .responseBody(body)
+                        .expiresAt(expiresAt)
+                        .build());
         repository.save(record);
         if (redisTemplate != null) {
             redisTemplate.opsForValue().set(REDIS_PREFIX + key, body, TTL);
