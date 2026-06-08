@@ -1,5 +1,7 @@
 FROM gcc:14-bookworm AS build
-RUN apt-get update && apt-get install -y \
+RUN sed -i 's/deb.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list \
+    && sed -i 's/security.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list \
+    && apt-get update && apt-get install -y \
     cmake \
     pkg-config \
     libgrpc++-dev \
@@ -18,7 +20,9 @@ RUN cmake -B build -DCMAKE_BUILD_TYPE=Release && cmake --build build -j && ctest
 
 FROM debian:bookworm-slim
 ARG GRPCURL_VERSION=1.9.2
-RUN apt-get update && apt-get install -y libstdc++6 libgrpc++1.51 libprotobuf32 ca-certificates wget \
+RUN sed -i 's/deb.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list \
+    && sed -i 's/security.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list \
+    && apt-get update && apt-get install -y libstdc++6 libgrpc++1.51 libprotobuf32 ca-certificates wget \
     && wget -qO- "https://github.com/fullstorydev/grpcurl/releases/download/v${GRPCURL_VERSION}/grpcurl_${GRPCURL_VERSION}_linux_x86_64.tar.gz" \
        | tar xz -C /usr/local/bin grpcurl \
     && rm -rf /var/lib/apt/lists/*
