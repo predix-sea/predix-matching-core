@@ -16,7 +16,10 @@ COPY include include
 COPY src src
 COPY tests tests
 COPY config config
-RUN cmake -B build -DCMAKE_BUILD_TYPE=Release && cmake --build build -j && ctest --test-dir build --output-on-failure
+RUN cmake -B build -DCMAKE_BUILD_TYPE=Release && cmake --build build -j && ctest --test-dir build --output-on-failure \
+    && mkdir -p /opt/runtime-libs \
+    && cp "$(readlink -f "$(gcc -print-file-name=libstdc++.so.6)")" /opt/runtime-libs/libstdc++.so.6 \
+    && cp "$(readlink -f "$(gcc -print-file-name=libgcc_s.so.1)")" /opt/runtime-libs/libgcc_s.so.1
 
 FROM debian:bookworm-slim
 ARG GRPCURL_VERSION=1.9.2
@@ -29,9 +32,12 @@ RUN sed -i 's/deb.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list.d/debia
        | tar xz -C /usr/local/bin grpcurl \
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
+COPY --from=build /opt/runtime-libs/libstdc++.so.6 /usr/local/lib/libstdc++.so.6
+COPY --from=build /opt/runtime-libs/libgcc_s.so.1 /usr/local/lib/libgcc_s.so.1
 COPY --from=build /src/build/matching_core /app/matching_core
 COPY config/core.yaml /app/config/core.yaml
 RUN mkdir -p /var/lib/predix
+ENV LD_LIBRARY_PATH=/usr/local/lib
 ENV PREDIX_CORE_CONFIG=/app/config/core.yaml
 EXPOSE 50051
 HEALTHCHECK --interval=5s --timeout=5s --retries=12 --start-period=10s \
