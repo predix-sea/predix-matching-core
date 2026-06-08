@@ -31,6 +31,7 @@ public class OrderBookReconciliationService {
     private final MatchingCoreClient matchingCoreClient;
     private final OrderBookWarmupService orderBookWarmupService;
     private final PredixProperties properties;
+    private final OrderBookReconciliationMetrics metrics;
 
     public int reconcileAllActiveBooks() {
         List<OrderBookEntity> books = orderBookRepository.findAll().stream()
@@ -57,7 +58,9 @@ public class OrderBookReconciliationService {
 
         log.warn("Order book drift detected marketId={} outcomeId={} dbLevels={} coreLevels={}",
                 marketId, outcomeId, dbDepth.size(), coreDepth.size());
+        metrics.recordDriftDetected();
         orderBookWarmupService.warmupBookFromDb(marketId, outcomeId);
+        metrics.recordDriftRepaired();
         return true;
     }
 

@@ -1,0 +1,14 @@
+predix:
+  clients:
+    market-schema:
+      mock: true
+  matching-core:
+    grpc:
+      enabled: false
+
+spring:
+  jpa:
+    hibernate:
+      ddl-auto: validate
+  flyway:
+    enabled: true

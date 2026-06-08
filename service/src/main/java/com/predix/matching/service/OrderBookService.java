@@ -16,6 +16,8 @@ import java.util.List;
 @RequiredArgsConstructor
 public class OrderBookService {
 
+    private static final int DEFAULT_DEPTH_LEVELS = 10;
+
     private final OrderBookRepository orderBookRepository;
     private final MatchingCoreClient matchingCoreClient;
     private final DtoMapper dtoMapper;
@@ -37,12 +39,16 @@ public class OrderBookService {
     public OrderBookResponse getOrderBook(String marketId, String outcomeId) {
         marketLifecycleService.validateForQuery(marketId);
         OrderBookEntity entity = ensureOrderBook(marketId, outcomeId);
+        List<DepthLevelResponse> depth = matchingCoreClient.getDepth(marketId, outcomeId, DEFAULT_DEPTH_LEVELS)
+                .stream()
+                .map(dtoMapper::toDepth)
+                .toList();
         return OrderBookResponse.builder()
                 .marketId(entity.getMarketId())
                 .outcomeId(entity.getOutcomeId())
                 .status(entity.getStatus())
                 .updatedAt(entity.getUpdatedAt())
-                .depth(List.of())
+                .depth(depth)
                 .build();
     }
 

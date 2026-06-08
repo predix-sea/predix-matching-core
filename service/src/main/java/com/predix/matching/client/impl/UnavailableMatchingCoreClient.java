@@ -15,7 +15,7 @@ import java.util.List;
  * Placeholder when gRPC to the C++ core is disabled. Matching is not available in-process.
  */
 @Component
-@Profile("!h2")
+@Profile("!h2 & !test")
 @ConditionalOnProperty(name = "predix.matching-core.grpc.enabled", havingValue = "false", matchIfMissing = true)
 public class UnavailableMatchingCoreClient implements MatchingCoreClient {
 

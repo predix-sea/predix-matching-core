@@ -41,6 +41,9 @@ class OrderBookReconciliationServiceTest {
     @Mock
     private OrderBookWarmupService orderBookWarmupService;
 
+    @Mock
+    private OrderBookReconciliationMetrics metrics;
+
     @InjectMocks
     private OrderBookReconciliationService reconciliationService;
 
@@ -55,7 +58,8 @@ class OrderBookReconciliationServiceTest {
                 orderRepository,
                 matchingCoreClient,
                 orderBookWarmupService,
-                properties
+                properties,
+                metrics
         );
     }
 
@@ -81,6 +85,8 @@ class OrderBookReconciliationServiceTest {
 
         assertThat(reconciliationService.reconcileBook("m1", "yes")).isTrue();
         verify(orderBookWarmupService).warmupBookFromDb("m1", "yes");
+        verify(metrics).recordDriftDetected();
+        verify(metrics).recordDriftRepaired();
     }
 
     @Test

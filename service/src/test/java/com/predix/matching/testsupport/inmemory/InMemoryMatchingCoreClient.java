@@ -18,7 +18,7 @@ import java.util.stream.Collectors;
 
 /** H2 integration tests only; production uses {@link com.predix.matching.client.impl.GrpcMatchingCoreClient}. */
 @Component
-@Profile("h2")
+@Profile({"h2", "test"})
 @Primary
 public class InMemoryMatchingCoreClient implements MatchingCoreClient {
 
