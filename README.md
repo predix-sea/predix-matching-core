@@ -359,6 +359,7 @@ predix-matching-core/
 
 ## Documentation
 
+- [Documentation index](docs/README.md)
 - [Architecture](docs/architecture.md)
 - [Matching rules](docs/matching-rules.md)
 - [Java compatibility mapping](docs/java-compat-mapping.md)
