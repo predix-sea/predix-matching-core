@@ -11,7 +11,6 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 import java.io.File;
-import java.util.concurrent.TimeUnit;
 
 @Slf4j
 @Configuration
@@ -41,10 +40,7 @@ public class MatchingCoreGrpcConfig {
     }
 
     @Bean
-    public MatchingCoreGrpc.MatchingCoreBlockingStub matchingCoreStub(
-            ManagedChannel matchingCoreChannel, PredixProperties properties) {
-        long deadlineMs = properties.getMatchingCore().getGrpc().getDeadlineMs();
-        return MatchingCoreGrpc.newBlockingStub(matchingCoreChannel)
-                .withDeadlineAfter(deadlineMs, TimeUnit.MILLISECONDS);
+    public MatchingCoreGrpc.MatchingCoreBlockingStub matchingCoreStub(ManagedChannel matchingCoreChannel) {
+        return MatchingCoreGrpc.newBlockingStub(matchingCoreChannel);
     }
 }

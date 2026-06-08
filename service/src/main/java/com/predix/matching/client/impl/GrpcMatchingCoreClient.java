@@ -4,6 +4,7 @@ import com.predix.matching.client.MatchingCoreClient;
 import com.predix.matching.client.dto.CoreMatchResult;
 import com.predix.matching.client.grpc.GrpcDecimalConverter;
 import com.predix.matching.client.grpc.GrpcStatusHelper;
+import com.predix.matching.config.PredixProperties;
 import com.predix.matching.domain.entity.OrderEntity;
 import com.predix.matching.grpc.BookOrderInput;
 import com.predix.matching.grpc.CancelOrderRequest;
@@ -23,6 +24,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -33,12 +35,17 @@ import java.util.stream.Collectors;
 public class GrpcMatchingCoreClient implements MatchingCoreClient {
 
     private final MatchingCoreGrpc.MatchingCoreBlockingStub stub;
+    private final PredixProperties properties;
+
+    private MatchingCoreGrpc.MatchingCoreBlockingStub callStub() {
+        return stub.withDeadlineAfter(properties.getMatchingCore().getGrpc().getDeadlineMs(), TimeUnit.MILLISECONDS);
+    }
 
     @Override
     public CoreMatchResult submitOrder(OrderEntity order) {
         try {
             BookOrderInput bookOrder = toBookOrderInput(order);
-            SubmitOrderResponse response = stub.submitOrder(SubmitOrderRequest.newBuilder()
+            SubmitOrderResponse response = callStub().submitOrder(SubmitOrderRequest.newBuilder()
                     .setMarketId(order.getMarketId())
                     .setOutcomeId(order.getOutcomeId())
                     .setOrder(bookOrder)
@@ -52,7 +59,7 @@ public class GrpcMatchingCoreClient implements MatchingCoreClient {
     @Override
     public boolean cancelOrder(OrderEntity order) {
         try {
-            return stub.cancelOrder(CancelOrderRequest.newBuilder()
+            return callStub().cancelOrder(CancelOrderRequest.newBuilder()
                     .setMarketId(order.getMarketId())
                     .setOutcomeId(order.getOutcomeId())
                     .setOrderId(order.getId().toString())
@@ -65,7 +72,7 @@ public class GrpcMatchingCoreClient implements MatchingCoreClient {
     @Override
     public List<CoreMatchResult.CoreDepthLevel> getDepth(String marketId, String outcomeId, int levels) {
         try {
-            return stub.getDepth(GetDepthRequest.newBuilder()
+            return callStub().getDepth(GetDepthRequest.newBuilder()
                     .setMarketId(marketId)
                     .setOutcomeId(outcomeId)
                     .setLevels(levels)
@@ -92,7 +99,7 @@ public class GrpcMatchingCoreClient implements MatchingCoreClient {
             for (CoreMatchResult.CoreBookOrder order : orders) {
                 builder.addOrders(toBookOrderInput(order));
             }
-            return stub.warmupBook(builder.build()).getLoadedCount();
+            return callStub().warmupBook(builder.build()).getLoadedCount();
         } catch (StatusRuntimeException e) {
             throw GrpcStatusHelper.toBusinessException("warmupBook", e);
         }
@@ -101,7 +108,7 @@ public class GrpcMatchingCoreClient implements MatchingCoreClient {
     @Override
     public boolean resetBook(String marketId, String outcomeId) {
         try {
-            return stub.resetBook(ResetBookRequest.newBuilder()
+            return callStub().resetBook(ResetBookRequest.newBuilder()
                     .setMarketId(marketId)
                     .setOutcomeId(outcomeId)
                     .build()).getReset();
@@ -113,7 +120,7 @@ public class GrpcMatchingCoreClient implements MatchingCoreClient {
     @Override
     public boolean healthCheck() {
         try {
-            return stub.health(HealthRequest.getDefaultInstance()).getHealthy();
+            return callStub().health(HealthRequest.getDefaultInstance()).getHealthy();
         } catch (StatusRuntimeException e) {
             log.warn("gRPC healthCheck failed: {}", e.getStatus());
             return false;
