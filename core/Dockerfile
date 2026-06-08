@@ -1,6 +1,6 @@
 FROM gcc:14-bookworm AS build
-RUN sed -i 's/deb.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list \
-    && sed -i 's/security.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list \
+RUN sed -i 's/deb.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list.d/debian.sources \
+    && sed -i 's/security.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list.d/debian.sources \
     && apt-get update && apt-get install -y \
     cmake \
     pkg-config \
@@ -20,10 +20,12 @@ RUN cmake -B build -DCMAKE_BUILD_TYPE=Release && cmake --build build -j && ctest
 
 FROM debian:bookworm-slim
 ARG GRPCURL_VERSION=1.9.2
-RUN sed -i 's/deb.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list \
-    && sed -i 's/security.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list \
+ARG TARGETARCH
+RUN sed -i 's/deb.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list.d/debian.sources \
+    && sed -i 's/security.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list.d/debian.sources \
     && apt-get update && apt-get install -y libstdc++6 libgrpc++1.51 libprotobuf32 ca-certificates wget \
-    && wget -qO- "https://github.com/fullstorydev/grpcurl/releases/download/v${GRPCURL_VERSION}/grpcurl_${GRPCURL_VERSION}_linux_x86_64.tar.gz" \
+    && GRPCURL_ARCH="$(case "$TARGETARCH" in amd64) echo x86_64 ;; arm64) echo arm64 ;; *) echo x86_64 ;; esac)" \
+    && wget -q --tries=3 --timeout=30 -O- "https://github.com/fullstorydev/grpcurl/releases/download/v${GRPCURL_VERSION}/grpcurl_${GRPCURL_VERSION}_linux_${GRPCURL_ARCH}.tar.gz" \
        | tar xz -C /usr/local/bin grpcurl \
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
