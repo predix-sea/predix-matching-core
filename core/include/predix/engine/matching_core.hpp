@@ -21,7 +21,7 @@ public:
     }
 
     MatchResult submitOrder(const std::string& market_id, const std::string& outcome_id,
-                            BookOrder order) {
+                            BookOrder order, bool write_wal = true) {
         Shard& shard = shardFor(market_id, outcome_id);
         std::lock_guard lock(shard.mutex);
         auto& book = shard.registry.getOrCreate(market_id, outcome_id);
@@ -33,7 +33,7 @@ public:
             return book.restingOrderResult(order.id);
         }
 
-        if (wal_) {
+        if (wal_ && write_wal) {
             wal_->appendSubmit(market_id, outcome_id, order);
         }
         MatchResult result = book.match(std::move(order));
@@ -42,7 +42,7 @@ public:
     }
 
     bool cancelOrder(const std::string& market_id, const std::string& outcome_id,
-                     const std::string& order_id) {
+                     const std::string& order_id, bool write_wal = true) {
         Shard& shard = shardFor(market_id, outcome_id);
         std::lock_guard lock(shard.mutex);
         OrderBook* book = shard.registry.get(market_id, outcome_id);
@@ -52,7 +52,7 @@ public:
         if (!book->hasRestingOrder(order_id)) {
             return false;
         }
-        if (wal_) {
+        if (wal_ && write_wal) {
             wal_->appendCancel(market_id, outcome_id, order_id);
         }
         const bool removed = book->removeFromBook(order_id);

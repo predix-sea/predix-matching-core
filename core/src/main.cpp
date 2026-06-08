@@ -1,5 +1,6 @@
 #include "predix/engine/matching_core.hpp"
 #include "predix/server/grpc_server.hpp"
+#include "predix/wal/wal_reader.hpp"
 #include "predix/wal/wal_writer.hpp"
 
 #include <cstdlib>
@@ -49,6 +50,12 @@ predix::server::CoreConfig loadConfig(const std::string& path) {
             config.wal_path = value;
         } else if (key == "wal_flush_each_append") {
             config.wal_flush_each_append = value == "true" || value == "1";
+        } else if (key == "wal_replay_on_startup") {
+            config.wal_replay_on_startup = value == "true" || value == "1";
+        } else if (key == "tls_cert_path") {
+            config.tls_cert_path = value;
+        } else if (key == "tls_key_path") {
+            config.tls_key_path = value;
         }
     }
 
@@ -69,6 +76,11 @@ int main(int argc, char** argv) {
     const predix::server::CoreConfig config = loadConfig(config_path);
     auto wal = std::make_shared<predix::wal::WalWriter>(config.wal_path, config.wal_flush_each_append);
     auto core = std::make_shared<predix::engine::MatchingCore>(config.shard_count, wal);
+
+    if (config.wal_replay_on_startup) {
+        const int replayed = predix::wal::WalReader::replay(config.wal_path, *core);
+        std::cout << "WAL replay applied " << replayed << " records from " << config.wal_path << std::endl;
+    }
 
     predix::server::GrpcServer server(config, core);
     server.start();

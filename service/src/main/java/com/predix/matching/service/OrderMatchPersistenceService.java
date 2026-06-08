@@ -75,6 +75,17 @@ public class OrderMatchPersistenceService {
     }
 
     @Transactional
+    public void markPendingMatch(UUID orderId) {
+        OrderEntity order = orderRepository.findByIdForUpdate(orderId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "Order not found"));
+        if (order.getStatus() == OrderStatus.NEW || order.getStatus() == OrderStatus.PARTIAL) {
+            OrderStatusTransition.validateTransition(order.getStatus(), OrderStatus.PENDING_MATCH);
+            order.setStatus(OrderStatus.PENDING_MATCH);
+            orderRepository.save(order);
+        }
+    }
+
+    @Transactional
     public OrderResponse finalizeMatch(UUID orderId, CoreMatchResult matchResult, String idempotencyKey) {
         OrderEntity order = orderRepository.findByIdForUpdate(orderId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "Order not found"));

@@ -14,6 +14,8 @@ public class PredixProperties {
     private Matching matching = new Matching();
     private MatchingCoreConfig matchingCore = new MatchingCoreConfig();
     private Reconciliation reconciliation = new Reconciliation();
+    private Admin admin = new Admin();
+    private PendingMatch pendingMatch = new PendingMatch();
     private Clients clients = new Clients();
     private Mq mq = new Mq();
     private Security security = new Security();
@@ -28,7 +30,22 @@ public class PredixProperties {
             private String host = "localhost";
             private int port = 50051;
             private long deadlineMs = 5000;
+            private boolean tlsEnabled = false;
+            private String trustCertPath;
         }
+    }
+
+    @Data
+    public static class Admin {
+        private boolean enabled = false;
+        private String apiKey = "";
+    }
+
+    @Data
+    public static class PendingMatch {
+        private boolean enabled = true;
+        private long intervalMs = 60000;
+        private int batchSize = 50;
     }
 
     @Data

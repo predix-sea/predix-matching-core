@@ -95,10 +95,22 @@ public class OrderService {
 
     private OrderResponse matchAndFinalize(OrderEntity order, String idempotencyKey) {
         CoreMatchResult matchResult = matchingCoreClient.submitOrder(order);
-        return orderMatchPersistenceService.finalizeMatch(order.getId(), matchResult, idempotencyKey);
+        try {
+            return orderMatchPersistenceService.finalizeMatch(order.getId(), matchResult, idempotencyKey);
+        } catch (RuntimeException e) {
+            log.error("finalizeMatch failed after gRPC submit for orderId={}", order.getId(), e);
+            try {
+                orderMatchPersistenceService.markPendingMatch(order.getId());
+            } catch (RuntimeException markError) {
+                log.error("Failed to mark order pending match for orderId={}", order.getId(), markError);
+            }
+            throw e;
+        }
     }
 
     private static boolean needsMatching(OrderEntity order) {
-        return order.getStatus() == OrderStatus.NEW || order.getStatus() == OrderStatus.PARTIAL;
+        return order.getStatus() == OrderStatus.NEW
+                || order.getStatus() == OrderStatus.PARTIAL
+                || order.getStatus() == OrderStatus.PENDING_MATCH;
     }
 }

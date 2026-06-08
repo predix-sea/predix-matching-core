@@ -24,7 +24,9 @@ public class OrderBookWarmupService {
 
     public WarmupSummary warmupAllOpenBooks() {
         List<OrderEntity> openOrders = orderRepository.findAll().stream()
-                .filter(o -> o.getStatus() == OrderStatus.NEW || o.getStatus() == OrderStatus.PARTIAL)
+                .filter(o -> o.getStatus() == OrderStatus.NEW
+                        || o.getStatus() == OrderStatus.PARTIAL
+                        || o.getStatus() == OrderStatus.PENDING_MATCH)
                 .toList();
 
         Map<String, List<CoreMatchResult.CoreBookOrder>> grouped = new HashMap<>();

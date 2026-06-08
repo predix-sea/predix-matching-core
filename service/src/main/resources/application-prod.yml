@@ -2,3 +2,5 @@ predix:
   matching-core:
     grpc:
       enabled: true
+  admin:
+    enabled: true

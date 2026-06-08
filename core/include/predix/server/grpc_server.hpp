@@ -12,6 +12,9 @@ struct CoreConfig {
     std::size_t shard_count = 4;
     std::string wal_path = "/var/lib/predix/wal.log";
     bool wal_flush_each_append = false;
+    bool wal_replay_on_startup = false;
+    std::string tls_cert_path;
+    std::string tls_key_path;
 };
 
 class GrpcServer {

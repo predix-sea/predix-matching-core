@@ -20,6 +20,11 @@ class OrderStatusTransitionTest {
             "NEW,CANCELLED,true",
             "PARTIAL,FILLED,true",
             "PARTIAL,CANCELLED,true",
+            "NEW,PENDING_MATCH,true",
+            "PENDING_MATCH,PARTIAL,true",
+            "PENDING_MATCH,FILLED,true",
+            "PENDING_MATCH,CANCELLED,true",
+            "PARTIAL,PENDING_MATCH,true",
             "FILLED,CANCELLED,false",
             "CANCELLED,NEW,false",
             "PARTIAL,NEW,false"
