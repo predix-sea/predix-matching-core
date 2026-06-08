@@ -48,7 +48,7 @@ services:
     volumes:
       - waldata:/var/lib/predix
     healthcheck:
-      test: ["CMD-SHELL", "pgrep matching_core >/dev/null && nc -z 127.0.0.1 50051"]
+      test: ["CMD-SHELL", "grpcurl -plaintext -d '{}' 127.0.0.1:50051 predix.matching.MatchingCore/Health | grep -q '\"healthy\": true'"]
       interval: 5s
       timeout: 5s
       retries: 12

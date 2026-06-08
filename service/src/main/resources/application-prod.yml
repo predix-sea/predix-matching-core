@@ -1,0 +1,4 @@
+predix:
+  matching-core:
+    grpc:
+      enabled: true
