@@ -76,8 +76,7 @@ public class OrderService {
     public OrderResponse cancelOrder(UUID orderId) {
         OrderEntity order = orderMatchPersistenceService.lockOrderForCancel(orderId);
         marketLifecycleService.validateForCancel(order.getMarketId());
-        matchingCoreClient.cancelOrder(order);
-        return orderMatchPersistenceService.finalizeCancel(order);
+        return cancelAndFinalize(order);
     }
 
     @Transactional(readOnly = true)
@@ -94,16 +93,47 @@ public class OrderService {
     }
 
     private OrderResponse matchAndFinalize(OrderEntity order, String idempotencyKey) {
-        CoreMatchResult matchResult = matchingCoreClient.submitOrder(order);
+        CoreMatchResult matchResult;
+        try {
+            matchResult = matchingCoreClient.submitOrder(order);
+        } catch (BusinessException e) {
+            if (e.getErrorCode() == ErrorCode.MATCHING_CORE_UNCERTAIN) {
+                log.warn("Uncertain gRPC submit for orderId={}; marking PENDING_MATCH", order.getId(), e);
+                orderMatchPersistenceService.markPendingMatch(order.getId());
+            }
+            throw e;
+        }
+
+        if (matchResult.isRejected()) {
+            orderMatchPersistenceService.finalizeRejected(order.getId(), matchResult, idempotencyKey);
+            throw new BusinessException(ErrorCode.ORDER_INSUFFICIENT_LIQUIDITY, matchResult.getRejectReason());
+        }
+
         try {
             return orderMatchPersistenceService.finalizeMatch(order.getId(), matchResult, idempotencyKey);
         } catch (RuntimeException e) {
             log.error("finalizeMatch failed after gRPC submit for orderId={}", order.getId(), e);
-            try {
-                orderMatchPersistenceService.markPendingMatch(order.getId());
-            } catch (RuntimeException markError) {
-                log.error("Failed to mark order pending match for orderId={}", order.getId(), markError);
+            orderMatchPersistenceService.markPendingMatch(order.getId());
+            throw e;
+        }
+    }
+
+    private OrderResponse cancelAndFinalize(OrderEntity order) {
+        try {
+            matchingCoreClient.cancelOrder(order);
+        } catch (BusinessException e) {
+            if (e.getErrorCode() == ErrorCode.MATCHING_CORE_UNCERTAIN) {
+                log.warn("Uncertain gRPC cancel for orderId={}; marking PENDING_CANCEL", order.getId(), e);
+                orderMatchPersistenceService.markPendingCancel(order.getId());
             }
+            throw e;
+        }
+
+        try {
+            return orderMatchPersistenceService.finalizeCancel(order.getId());
+        } catch (RuntimeException e) {
+            log.error("finalizeCancel failed after gRPC cancel for orderId={}", order.getId(), e);
+            orderMatchPersistenceService.markPendingCancel(order.getId());
             throw e;
         }
     }

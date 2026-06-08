@@ -86,6 +86,35 @@ public class OrderMatchPersistenceService {
     }
 
     @Transactional
+    public void markPendingCancel(UUID orderId) {
+        OrderEntity order = orderRepository.findByIdForUpdate(orderId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "Order not found"));
+        if (order.getStatus() == OrderStatus.PENDING_CANCEL) {
+            return;
+        }
+        if (order.getStatus().canCancel() || order.getStatus() == OrderStatus.PENDING_MATCH) {
+            OrderStatusTransition.validateTransition(order.getStatus(), OrderStatus.PENDING_CANCEL);
+            order.setStatus(OrderStatus.PENDING_CANCEL);
+            orderRepository.save(order);
+        }
+    }
+
+    @Transactional
+    public OrderResponse finalizeRejected(UUID orderId, CoreMatchResult matchResult, String idempotencyKey) {
+        OrderEntity order = orderRepository.findByIdForUpdate(orderId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "Order not found"));
+
+        OrderStatusTransition.validateTransition(order.getStatus(), OrderStatus.REJECTED);
+        order.setRemainingQuantity(BigDecimal.ZERO);
+        order.setStatus(OrderStatus.REJECTED);
+        order = orderRepository.save(order);
+
+        OrderResponse response = dtoMapper.toOrderResponse(order);
+        idempotencyService.saveResponse(idempotencyKey, "ORDER", order.getId().toString(), response);
+        return response;
+    }
+
+    @Transactional
     public OrderResponse finalizeMatch(UUID orderId, CoreMatchResult matchResult, String idempotencyKey) {
         OrderEntity order = orderRepository.findByIdForUpdate(orderId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "Order not found"));
@@ -111,18 +140,25 @@ public class OrderMatchPersistenceService {
         OrderEntity order = orderRepository.findByIdForUpdate(orderId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "Order not found"));
 
+        if (order.getStatus() == OrderStatus.PENDING_CANCEL) {
+            return order;
+        }
+
         if (order.getStatus().isFinal()) {
             throw new BusinessException(ErrorCode.ORDER_ALREADY_FINALIZED);
         }
         if (!order.getStatus().canCancel()) {
             throw new BusinessException(ErrorCode.ORDER_INVALID_TRANSITION);
         }
-        OrderStatusTransition.validateTransition(order.getStatus(), OrderStatus.CANCELLED);
         return order;
     }
 
     @Transactional
-    public OrderResponse finalizeCancel(OrderEntity order) {
+    public OrderResponse finalizeCancel(UUID orderId) {
+        OrderEntity order = orderRepository.findByIdForUpdate(orderId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "Order not found"));
+
+        OrderStatusTransition.validateTransition(order.getStatus(), OrderStatus.CANCELLED);
         order.setStatus(OrderStatus.CANCELLED);
         order.setRemainingQuantity(BigDecimal.ZERO);
         order = orderRepository.save(order);

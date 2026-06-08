@@ -3,8 +3,6 @@ package com.predix.matching.testsupport.inmemory;
 import com.predix.matching.client.MatchingCoreClient;
 import com.predix.matching.client.dto.CoreMatchResult;
 import com.predix.matching.domain.entity.OrderEntity;
-import com.predix.matching.exception.BusinessException;
-import com.predix.matching.exception.ErrorCode;
 import com.predix.matching.engine.model.TradeFill;
 import com.predix.matching.testsupport.inmemory.model.BookOrder;
 import com.predix.matching.testsupport.inmemory.model.MatchResult;
@@ -28,9 +26,6 @@ public class InMemoryMatchingCoreClient implements MatchingCoreClient {
     public CoreMatchResult submitOrder(OrderEntity order) {
         MatchResult result = registry.getOrCreate(order.getMarketId(), order.getOutcomeId())
                 .match(toBookOrder(order));
-        if (result.isRejected()) {
-            throw new BusinessException(ErrorCode.ORDER_INSUFFICIENT_LIQUIDITY, result.getRejectReason());
-        }
         return toCoreResult(order.getId(), result);
     }
 

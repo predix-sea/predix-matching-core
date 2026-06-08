@@ -3,9 +3,8 @@ package com.predix.matching.client.impl;
 import com.predix.matching.client.MatchingCoreClient;
 import com.predix.matching.client.dto.CoreMatchResult;
 import com.predix.matching.client.grpc.GrpcDecimalConverter;
+import com.predix.matching.client.grpc.GrpcStatusHelper;
 import com.predix.matching.domain.entity.OrderEntity;
-import com.predix.matching.exception.BusinessException;
-import com.predix.matching.exception.ErrorCode;
 import com.predix.matching.grpc.BookOrderInput;
 import com.predix.matching.grpc.CancelOrderRequest;
 import com.predix.matching.grpc.GetDepthRequest;
@@ -44,12 +43,9 @@ public class GrpcMatchingCoreClient implements MatchingCoreClient {
                     .setOutcomeId(order.getOutcomeId())
                     .setOrder(bookOrder)
                     .build());
-            if (response.getRejected()) {
-                throw new BusinessException(ErrorCode.ORDER_INSUFFICIENT_LIQUIDITY, response.getRejectReason());
-            }
             return toCoreResult(order.getId(), response);
         } catch (StatusRuntimeException e) {
-            throw grpcUnavailable("submitOrder", e);
+            throw GrpcStatusHelper.toBusinessException("submitOrder", e);
         }
     }
 
@@ -62,7 +58,7 @@ public class GrpcMatchingCoreClient implements MatchingCoreClient {
                     .setOrderId(order.getId().toString())
                     .build()).getRemoved();
         } catch (StatusRuntimeException e) {
-            throw grpcUnavailable("cancelOrder", e);
+            throw GrpcStatusHelper.toBusinessException("cancelOrder", e);
         }
     }
 
@@ -81,7 +77,7 @@ public class GrpcMatchingCoreClient implements MatchingCoreClient {
                             .build())
                     .collect(Collectors.toList());
         } catch (StatusRuntimeException e) {
-            throw grpcUnavailable("getDepth", e);
+            throw GrpcStatusHelper.toBusinessException("getDepth", e);
         }
     }
 
@@ -98,7 +94,7 @@ public class GrpcMatchingCoreClient implements MatchingCoreClient {
             }
             return stub.warmupBook(builder.build()).getLoadedCount();
         } catch (StatusRuntimeException e) {
-            throw grpcUnavailable("warmupBook", e);
+            throw GrpcStatusHelper.toBusinessException("warmupBook", e);
         }
     }
 
@@ -110,7 +106,7 @@ public class GrpcMatchingCoreClient implements MatchingCoreClient {
                     .setOutcomeId(outcomeId)
                     .build()).getReset();
         } catch (StatusRuntimeException e) {
-            throw grpcUnavailable("resetBook", e);
+            throw GrpcStatusHelper.toBusinessException("resetBook", e);
         }
     }
 
@@ -122,11 +118,6 @@ public class GrpcMatchingCoreClient implements MatchingCoreClient {
             log.warn("gRPC healthCheck failed: {}", e.getStatus());
             return false;
         }
-    }
-
-    private BusinessException grpcUnavailable(String operation, StatusRuntimeException e) {
-        log.error("gRPC {} failed: {}", operation, e.getStatus());
-        return new BusinessException(ErrorCode.MATCHING_CORE_UNAVAILABLE, e.getStatus().getDescription());
     }
 
     private CoreMatchResult toCoreResult(UUID orderId, SubmitOrderResponse response) {

@@ -16,6 +16,7 @@ public class PredixProperties {
     private Reconciliation reconciliation = new Reconciliation();
     private Admin admin = new Admin();
     private PendingMatch pendingMatch = new PendingMatch();
+    private PendingCancel pendingCancel = new PendingCancel();
     private Clients clients = new Clients();
     private Mq mq = new Mq();
     private Security security = new Security();
@@ -43,6 +44,13 @@ public class PredixProperties {
 
     @Data
     public static class PendingMatch {
+        private boolean enabled = true;
+        private long intervalMs = 60000;
+        private int batchSize = 50;
+    }
+
+    @Data
+    public static class PendingCancel {
         private boolean enabled = true;
         private long intervalMs = 60000;
         private int batchSize = 50;

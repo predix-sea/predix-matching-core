@@ -14,7 +14,7 @@ Archived `predix-matching-engine` → new `predix-matching-core` module mapping.
 | `mq/*` | `service/.../mq/*` | Same exchange, queues, routing keys |
 | `idempotency/*` | `service/.../idempotency/*` | Redis + DB; `saveResponse` upserts on retry |
 | `db/migration/V1__init.sql` | `service/src/main/resources/db/migration/V1__init.sql` | Base schema |
-| `db/migration/` (new) | `V2__pending_match_status.sql` | Adds `PENDING_MATCH` order status |
+| `db/migration/` (new) | `V2__pending_match_status.sql`, `V3__pending_cancel_status.sql` | Recovery statuses |
 | `config/OrderBookWarmup` | `service/.../config/OrderBookWarmup.java` | Calls `WarmupBook` gRPC |
 | `client/MarketSchemaClient` | `service/.../client/*` | Unchanged HTTP contract |
 | `client/CtfExecutionGateway` | `service/.../client/*` | Unchanged HTTP contract |
@@ -28,6 +28,8 @@ Archived `predix-matching-engine` → new `predix-matching-core` module mapping.
 | `OrderBookReconciliationMetrics` | Prometheus drift counters |
 | `MatchingCoreHealthMonitor` | C++ recovery detection + full warmup |
 | `PendingMatchRecoveryService` | Background retry for `PENDING_MATCH` orders |
+| `PendingCancelRecoveryService` | Background retry for `PENDING_CANCEL` orders |
+| `GrpcStatusHelper` | Classifies uncertain gRPC failures (timeout, etc.) |
 | `AdminOrderBookController` | Operator reload API (`ResetBook` + warmup) |
 | `AdminAuthFilter` | `X-Admin-Api-Key` gate for admin routes |
 | `GrpcMatchingCoreClient` | Production gRPC client (TLS optional) |
@@ -61,7 +63,8 @@ Archived `predix-matching-engine` → new `predix-matching-core` module mapping.
 |--------|---------|
 | `NEW` | Persisted, awaiting or undergoing match |
 | `PARTIAL` | Partially filled, remainder may rest on book |
-| `PENDING_MATCH` | gRPC match succeeded; DB finalize pending retry |
+| `PENDING_MATCH` | gRPC match uncertain or DB finalize pending retry |
+| `PENDING_CANCEL` | gRPC cancel uncertain or DB finalize pending retry |
 | `FILLED` | Fully matched |
 | `CANCELLED` | Cancelled by user |
 | `REJECTED` | Rejected (e.g. market order with no liquidity) |

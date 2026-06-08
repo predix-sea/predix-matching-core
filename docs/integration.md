@@ -105,6 +105,8 @@ When `MATCHING_CORE_GRPC_ENABLED=false` outside test profiles, place/cancel/dept
 | `MATCHING_RECONCILIATION_DEPTH_LEVELS` | `20` | Depth levels compared |
 | `PREDIX_PENDING_MATCH_ENABLED` | `true` | Background retry for stuck matches |
 | `PREDIX_PENDING_MATCH_INTERVAL_MS` | `60000` | Pending-match worker interval |
+| `PREDIX_PENDING_CANCEL_ENABLED` | `true` | Background retry for stuck cancels |
+| `PREDIX_PENDING_CANCEL_INTERVAL_MS` | `60000` | Pending-cancel worker interval |
 | `PREDIX_ADMIN_ENABLED` | `false` | Enable admin reload API |
 | `PREDIX_ADMIN_API_KEY` | — | Required when admin enabled |
 
@@ -175,6 +177,7 @@ Repeat the place-order curl with the same `clientOrderId` — response should co
 | `ORDER_INVALID_TRANSITION` | 409 | Illegal status change |
 | `NOT_FOUND` | 404 | Order / resource not found |
 | `MATCHING_CORE_UNAVAILABLE` | 503 | C++ core unreachable or gRPC disabled |
+| `MATCHING_CORE_UNCERTAIN` | 503 | gRPC outcome unknown (e.g. timeout); order marked for recovery |
 | `MARKET_SCHEMA_UNAVAILABLE` | 503 | Market-schema service down |
 
 ## Observability

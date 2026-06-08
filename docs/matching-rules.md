@@ -33,21 +33,28 @@ Always the **maker** (resting order) price.
 
 | From | Allowed to |
 |------|------------|
-| NEW | PARTIAL, FILLED, CANCELLED, REJECTED, PENDING_MATCH |
-| PARTIAL | FILLED, CANCELLED, PENDING_MATCH |
-| PENDING_MATCH | PARTIAL, FILLED, CANCELLED |
+| NEW | PARTIAL, FILLED, CANCELLED, REJECTED, PENDING_MATCH, PENDING_CANCEL |
+| PARTIAL | FILLED, CANCELLED, PENDING_MATCH, PENDING_CANCEL |
+| PENDING_MATCH | PARTIAL, FILLED, CANCELLED, PENDING_CANCEL |
+| PENDING_CANCEL | CANCELLED |
 | FILLED / CANCELLED / REJECTED | (terminal) |
 
 Illegal transitions throw `ORDER_INVALID_TRANSITION`.
 
-### `PENDING_MATCH`
+### `PENDING_MATCH` / `PENDING_CANCEL`
 
-Internal recovery state — not exposed to end users via a separate API. Set when:
+Internal recovery states — not separate public API endpoints.
 
-1. gRPC `SubmitOrder` succeeds in C++
-2. Java `finalizeMatch` (DB persist) fails
+| Status | Set when |
+|--------|----------|
+| `PENDING_MATCH` | gRPC submit outcome uncertain, or `finalizeMatch` fails after successful submit |
+| `PENDING_CANCEL` | gRPC cancel outcome uncertain, or `finalizeCancel` fails after successful cancel |
 
-A background worker retries finalize using C++ idempotency (same `orderId` returns cached match result). Orders in `PENDING_MATCH` can still be cancelled.
+Background workers retry the gRPC + DB finalize steps. C++ idempotency makes submit retries safe.
+
+### `REJECTED`
+
+Market orders with no liquidity are persisted as **`REJECTED`** (terminal), not left as `NEW`. The first HTTP response is still `400 ORDER_INSUFFICIENT_LIQUIDITY`; idempotent retries return the cached `REJECTED` order.
 
 ## Cancel rules
 

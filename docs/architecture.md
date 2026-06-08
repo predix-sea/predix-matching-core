@@ -79,6 +79,8 @@ If step 6 fails after step 5 succeeds, the order is marked `PENDING_MATCH` and a
 2. **Outside TX:** gRPC `CancelOrder`
 3. **TX 2:** Set status `CANCELLED`; emit events; create cancel execution task
 
+If step 2 fails with an uncertain gRPC error, or step 3 fails after a successful cancel, the order is marked **`PENDING_CANCEL`** and `PendingCancelScheduler` retries.
+
 ## Consistency & recovery
 
 | Mechanism | Component | Purpose |
@@ -88,7 +90,10 @@ If step 6 fails after step 5 succeeds, the order is marked `PENDING_MATCH` and a
 | **Submit idempotency** | C++ `submission_cache_` | Duplicate `SubmitOrder` for same `orderId` returns cached result |
 | **Client idempotency** | `IdempotencyService` | Duplicate `clientOrderId` returns cached HTTP response (upsert-safe) |
 | **Fail-fast gRPC** | `GrpcMatchingCoreClient` | Core unavailable → `503`, no silent Java fallback |
-| **`PENDING_MATCH` worker** | `PendingMatchRecoveryService` + `PendingMatchScheduler` | Retry DB finalize after gRPC success + persist failure |
+| **Uncertain gRPC** | `GrpcStatusHelper` + `OrderService` | Timeout/ambiguous errors → `MATCHING_CORE_UNCERTAIN` + `PENDING_MATCH` |
+| **`PENDING_MATCH` worker** | `PendingMatchRecoveryService` + scheduler | Retry submit + DB finalize |
+| **`PENDING_CANCEL` worker** | `PendingCancelRecoveryService` + scheduler | Retry cancel + DB finalize |
+| **Rejected orders** | `finalizeRejected` | Market-order rejection persisted as `REJECTED`, not left as `NEW` |
 | **Health monitor** | `MatchingCoreHealthMonitor` | After C++ recovery, trigger full DB warmup |
 | **Depth reconciliation** | `OrderBookReconciliationService` + scheduler | Compare DB-aggregated depth vs C++ `GetDepth`; repair drift via warmup |
 | **Drift metrics** | `OrderBookReconciliationMetrics` | Prometheus counters `predix.orderbook.drift.detected` / `.repaired` |
@@ -151,6 +156,7 @@ Warmup/reload operations do not append to WAL — DB remains the authoritative r
 | `MatchingCoreHealthMonitor` | 30 s | Probe C++ `Health`; full warmup on recovery |
 | `OrderBookReconciliationScheduler` | 5 min | Detect/repair DB vs C++ depth drift |
 | `PendingMatchScheduler` | 60 s | Retry `PENDING_MATCH` orders |
+| `PendingCancelScheduler` | 60 s | Retry `PENDING_CANCEL` orders |
 | `RetryScheduler` | 30 s | Retry failed CTF execution tasks |
 
 ## CI

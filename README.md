@@ -49,7 +49,10 @@ Matching logic runs **only in C++**. Java does not maintain a production in-memo
 | **Warmup** | On startup, load `NEW` / `PARTIAL` / `PENDING_MATCH` orders from PostgreSQL into C++ via `WarmupBook` (replace mode) |
 | **Idempotent submit** | Duplicate `SubmitOrder` for the same `orderId` returns the cached result — safe under gRPC retries |
 | **Fail-fast gRPC** | On core unavailability, return `503 MATCHING_CORE_UNAVAILABLE` — no silent in-process fallback |
-| **`PENDING_MATCH` worker** | If gRPC succeeds but DB finalize fails, mark the order `PENDING_MATCH` and retry on a schedule |
+| **Uncertain gRPC recovery** | Timeout / ambiguous gRPC errors → `MATCHING_CORE_UNCERTAIN` + `PENDING_MATCH` for background retry |
+| **`PENDING_MATCH` worker** | Retries DB finalize after gRPC success or uncertain submit |
+| **`PENDING_CANCEL` worker** | Symmetric recovery when gRPC cancel succeeds or is uncertain but DB finalize fails |
+| **Rejected market orders** | Persisted as terminal `REJECTED` (not left as `NEW`); idempotency cache on retry |
 | **Health monitor** | After C++ recovery, trigger a full DB warmup automatically |
 | **Depth reconciliation** | Periodically compare DB-aggregated depth vs C++ `GetDepth`; repair drift from PostgreSQL |
 | **WAL replay (optional)** | C++ can replay `SUBMIT`/`CANCEL` records from disk on startup before accepting gRPC traffic |
@@ -90,7 +93,7 @@ cd service
 mvn test
 ```
 
-**Result: 37 / 37 passed** · **BUILD SUCCESS** (~60 s)
+**Result: 45 / 45 passed** · **BUILD SUCCESS**
 
 | Test Class | Area |
 |------------|------|
@@ -101,6 +104,8 @@ mvn test
 | `OrderBookReconciliationMetricsTest` | Prometheus drift counters |
 | `MatchingCoreHealthMonitorTest` | Recovery-triggered warmup |
 | `PendingMatchRecoveryServiceTest` | Stuck-match retry worker |
+| `PendingCancelRecoveryServiceTest` | Stuck-cancel retry worker |
+| `GrpcStatusHelperTest` | gRPC timeout / uncertain error classification |
 | `OrderBookQueryH2Test` | Order book metadata + live depth |
 | `MatchingEngineTest` | Post-match status & maker fill helpers |
 | `OrderValidationServiceTest` | Request validation rules |
@@ -121,8 +126,8 @@ Runs `MatchingFlowIntegrationTest` and `OrderServiceIdempotencyTest` against Pos
 | Layer | Tests | Failures | Status |
 |-------|------:|---------:|--------|
 | C++ (`matching_core_tests`) | 9 | 0 | PASS |
-| Java (`mvn test`) | 37 | 0 | PASS |
-| **Total (default suite)** | **46** | **0** | **PASS** |
+| Java (`mvn test`) | 45 | 0 | PASS |
+| **Total (default suite)** | **54** | **0** | **PASS** |
 
 ### Continuous Integration
 
@@ -217,6 +222,9 @@ Prometheus metrics exposed when drift is detected:
 PREDIX_PENDING_MATCH_ENABLED=true             # default: true
 PREDIX_PENDING_MATCH_INTERVAL_MS=60000
 PREDIX_PENDING_MATCH_BATCH_SIZE=50
+PREDIX_PENDING_CANCEL_ENABLED=true            # symmetric cancel recovery
+PREDIX_PENDING_CANCEL_INTERVAL_MS=60000
+PREDIX_PENDING_CANCEL_BATCH_SIZE=50
 ```
 
 ### Admin reload API
