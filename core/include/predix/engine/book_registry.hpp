@@ -41,6 +41,12 @@ public:
         return it == books_.end() ? nullptr : &it->second;
     }
 
+    bool reset(const std::string& market_id, const std::string& outcome_id) {
+        BookKey key{market_id, outcome_id};
+        std::lock_guard lock(mutex_);
+        return books_.erase(key) > 0;
+    }
+
 private:
     std::mutex mutex_;
     std::unordered_map<BookKey, OrderBook, BookKeyHash> books_;

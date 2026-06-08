@@ -1,3 +1,7 @@
 shard_count: 4
 listen_port: 50051
 wal_path: /var/lib/predix/matching.wal
+wal_flush_each_append: false
+wal_replay_on_startup: false
+# tls_cert_path: /app/certs/server.crt
+# tls_key_path: /app/certs/server.key

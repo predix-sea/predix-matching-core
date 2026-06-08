@@ -38,11 +38,13 @@ public interface OrderRepository extends JpaRepository<OrderEntity, UUID> {
     @Query("""
             SELECT o FROM OrderEntity o
             WHERE o.marketId = :marketId AND o.outcomeId = :outcomeId
-              AND o.status IN ('NEW', 'PARTIAL')
+              AND o.status IN ('NEW', 'PARTIAL', 'PENDING_MATCH')
             ORDER BY o.createdAt ASC
             """)
     List<OrderEntity> findOpenOrders(String marketId, String outcomeId);
 
     List<OrderEntity> findByMarketIdAndOutcomeIdAndStatusIn(
             String marketId, String outcomeId, List<OrderStatus> statuses);
+
+    List<OrderEntity> findByStatusOrderByUpdatedAtAsc(OrderStatus status, org.springframework.data.domain.Pageable pageable);
 }

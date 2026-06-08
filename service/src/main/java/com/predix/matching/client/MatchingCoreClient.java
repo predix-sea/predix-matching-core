@@ -13,7 +13,14 @@ public interface MatchingCoreClient {
 
     List<CoreMatchResult.CoreDepthLevel> getDepth(String marketId, String outcomeId, int levels);
 
-    int warmupBook(String marketId, String outcomeId, List<CoreMatchResult.CoreBookOrder> orders);
+    default int warmupBook(String marketId, String outcomeId, List<CoreMatchResult.CoreBookOrder> orders) {
+        return warmupBook(marketId, outcomeId, orders, true);
+    }
+
+    int warmupBook(String marketId, String outcomeId, List<CoreMatchResult.CoreBookOrder> orders,
+                   boolean replaceExisting);
+
+    boolean resetBook(String marketId, String outcomeId);
 
     boolean healthCheck();
 }

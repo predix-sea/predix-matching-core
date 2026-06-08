@@ -1,4 +1,4 @@
-package com.predix.matching.engine.model;
+package com.predix.matching.testsupport.inmemory.model;
 
 import com.predix.matching.domain.enums.OrderSide;
 import com.predix.matching.domain.enums.OrderType;

@@ -3,14 +3,14 @@ package com.predix.matching.client.impl;
 import com.predix.matching.client.MatchingCoreClient;
 import com.predix.matching.client.dto.CoreMatchResult;
 import com.predix.matching.client.grpc.GrpcDecimalConverter;
+import com.predix.matching.client.grpc.GrpcStatusHelper;
 import com.predix.matching.domain.entity.OrderEntity;
-import com.predix.matching.exception.BusinessException;
-import com.predix.matching.exception.ErrorCode;
 import com.predix.matching.grpc.BookOrderInput;
 import com.predix.matching.grpc.CancelOrderRequest;
 import com.predix.matching.grpc.GetDepthRequest;
 import com.predix.matching.grpc.HealthRequest;
 import com.predix.matching.grpc.MatchingCoreGrpc;
+import com.predix.matching.grpc.ResetBookRequest;
 import com.predix.matching.grpc.SubmitOrderRequest;
 import com.predix.matching.grpc.SubmitOrderResponse;
 import com.predix.matching.grpc.WarmupBookRequest;
@@ -33,7 +33,6 @@ import java.util.stream.Collectors;
 public class GrpcMatchingCoreClient implements MatchingCoreClient {
 
     private final MatchingCoreGrpc.MatchingCoreBlockingStub stub;
-    private final LocalMatchingCoreClient fallback;
 
     @Override
     public CoreMatchResult submitOrder(OrderEntity order) {
@@ -44,13 +43,9 @@ public class GrpcMatchingCoreClient implements MatchingCoreClient {
                     .setOutcomeId(order.getOutcomeId())
                     .setOrder(bookOrder)
                     .build());
-            if (response.getRejected()) {
-                throw new BusinessException(ErrorCode.ORDER_INSUFFICIENT_LIQUIDITY, response.getRejectReason());
-            }
             return toCoreResult(order.getId(), response);
         } catch (StatusRuntimeException e) {
-            log.warn("gRPC submitOrder failed, falling back to local core: {}", e.getStatus());
-            return fallback.submitOrder(order);
+            throw GrpcStatusHelper.toBusinessException("submitOrder", e);
         }
     }
 
@@ -63,8 +58,7 @@ public class GrpcMatchingCoreClient implements MatchingCoreClient {
                     .setOrderId(order.getId().toString())
                     .build()).getRemoved();
         } catch (StatusRuntimeException e) {
-            log.warn("gRPC cancelOrder failed, falling back to local core: {}", e.getStatus());
-            return fallback.cancelOrder(order);
+            throw GrpcStatusHelper.toBusinessException("cancelOrder", e);
         }
     }
 
@@ -83,24 +77,36 @@ public class GrpcMatchingCoreClient implements MatchingCoreClient {
                             .build())
                     .collect(Collectors.toList());
         } catch (StatusRuntimeException e) {
-            log.warn("gRPC getDepth failed, falling back to local core: {}", e.getStatus());
-            return fallback.getDepth(marketId, outcomeId, levels);
+            throw GrpcStatusHelper.toBusinessException("getDepth", e);
         }
     }
 
     @Override
-    public int warmupBook(String marketId, String outcomeId, List<CoreMatchResult.CoreBookOrder> orders) {
+    public int warmupBook(String marketId, String outcomeId, List<CoreMatchResult.CoreBookOrder> orders,
+                          boolean replaceExisting) {
         try {
             WarmupBookRequest.Builder builder = WarmupBookRequest.newBuilder()
                     .setMarketId(marketId)
-                    .setOutcomeId(outcomeId);
+                    .setOutcomeId(outcomeId)
+                    .setReplaceExisting(replaceExisting);
             for (CoreMatchResult.CoreBookOrder order : orders) {
                 builder.addOrders(toBookOrderInput(order));
             }
             return stub.warmupBook(builder.build()).getLoadedCount();
         } catch (StatusRuntimeException e) {
-            log.warn("gRPC warmupBook failed, falling back to local core: {}", e.getStatus());
-            return fallback.warmupBook(marketId, outcomeId, orders);
+            throw GrpcStatusHelper.toBusinessException("warmupBook", e);
+        }
+    }
+
+    @Override
+    public boolean resetBook(String marketId, String outcomeId) {
+        try {
+            return stub.resetBook(ResetBookRequest.newBuilder()
+                    .setMarketId(marketId)
+                    .setOutcomeId(outcomeId)
+                    .build()).getReset();
+        } catch (StatusRuntimeException e) {
+            throw GrpcStatusHelper.toBusinessException("resetBook", e);
         }
     }
 
@@ -109,7 +115,8 @@ public class GrpcMatchingCoreClient implements MatchingCoreClient {
         try {
             return stub.health(HealthRequest.getDefaultInstance()).getHealthy();
         } catch (StatusRuntimeException e) {
-            return fallback.healthCheck();
+            log.warn("gRPC healthCheck failed: {}", e.getStatus());
+            return false;
         }
     }
 

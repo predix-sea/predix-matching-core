@@ -8,6 +8,8 @@ import com.predix.matching.domain.enums.OrderType;
 import com.predix.matching.repository.ExecutionTaskRepository;
 import com.predix.matching.repository.OrderRepository;
 import com.predix.matching.repository.TradeRepository;
+import com.predix.matching.exception.BusinessException;
+import com.predix.matching.exception.ErrorCode;
 import com.predix.matching.support.H2IntegrationTestBase;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -15,6 +17,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import java.math.BigDecimal;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class OrderServiceH2Test extends H2IntegrationTestBase {
 
@@ -60,6 +63,21 @@ class OrderServiceH2Test extends H2IntegrationTestBase {
                 request("u2", OrderSide.BUY, "0.30", "10", "h2-cancel"));
         OrderResponse cancelled = orderService.cancelOrder(placed.getId());
         assertThat(cancelled.getStatus()).isEqualTo(OrderStatus.CANCELLED);
+    }
+
+    @Test
+    void rejectedMarketOrder_persistsRejectedStatus() {
+        PlaceOrderRequest request = request("u-market", OrderSide.BUY, "0.50", "5", "h2-mkt-reject");
+        request.setOrderType(OrderType.MARKET);
+        request.setPrice(null);
+
+        assertThatThrownBy(() -> orderService.placeOrder(request))
+                .isInstanceOf(BusinessException.class)
+                .extracting(e -> ((BusinessException) e).getErrorCode())
+                .isEqualTo(ErrorCode.ORDER_INSUFFICIENT_LIQUIDITY);
+
+        OrderResponse retry = orderService.placeOrder(request);
+        assertThat(retry.getStatus()).isEqualTo(OrderStatus.REJECTED);
     }
 
     private PlaceOrderRequest request(String userId, OrderSide side, String price, String qty, String clientId) {

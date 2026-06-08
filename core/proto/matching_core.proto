@@ -83,10 +83,20 @@ message WarmupBookRequest {
   string market_id = 1;
   string outcome_id = 2;
   repeated BookOrderInput orders = 3;
+  bool replace_existing = 4;
 }
 
 message WarmupBookResponse {
   int32 loaded_count = 1;
+}
+
+message ResetBookRequest {
+  string market_id = 1;
+  string outcome_id = 2;
+}
+
+message ResetBookResponse {
+  bool reset = 1;
 }
 
 message HealthRequest {}
@@ -102,5 +112,6 @@ service MatchingCore {
   rpc CancelOrder(CancelOrderRequest) returns (CancelOrderResponse);
   rpc GetDepth(GetDepthRequest) returns (GetDepthResponse);
   rpc WarmupBook(WarmupBookRequest) returns (WarmupBookResponse);
+  rpc ResetBook(ResetBookRequest) returns (ResetBookResponse);
   rpc Health(HealthRequest) returns (HealthResponse);
 }

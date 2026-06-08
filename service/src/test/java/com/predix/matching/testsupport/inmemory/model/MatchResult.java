@@ -1,5 +1,6 @@
-package com.predix.matching.engine.model;
+package com.predix.matching.testsupport.inmemory.model;
 
+import com.predix.matching.engine.model.TradeFill;
 import lombok.Builder;
 import lombok.Singular;
 import lombok.Value;

@@ -7,5 +7,6 @@ RUN apk add --no-cache maven && mvn -q -DskipTests package && mv target/*.jar ap
 FROM eclipse-temurin:21-jre-alpine
 WORKDIR /app
 COPY --from=build /app/app.jar app.jar
+ENV SPRING_PROFILES_ACTIVE=prod
 EXPOSE 8082
 ENTRYPOINT ["java", "-jar", "app.jar"]

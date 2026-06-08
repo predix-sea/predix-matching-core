@@ -57,9 +57,29 @@ predix:
     retry-base-delay-ms: 1000
   matching-core:
     grpc:
+      # Local dev default: false (503 without C++). Production/Docker: profile prod or MATCHING_CORE_GRPC_ENABLED=true.
       enabled: ${MATCHING_CORE_GRPC_ENABLED:false}
       host: ${MATCHING_CORE_HOST:localhost}
       port: ${MATCHING_CORE_PORT:50051}
+      deadline-ms: ${MATCHING_CORE_GRPC_DEADLINE_MS:5000}
+      tls-enabled: ${MATCHING_CORE_GRPC_TLS_ENABLED:false}
+      trust-cert-path: ${MATCHING_CORE_GRPC_TRUST_CERT:}
+    health-check-ms: ${MATCHING_CORE_HEALTH_CHECK_MS:30000}
+  admin:
+    enabled: ${PREDIX_ADMIN_ENABLED:false}
+    api-key: ${PREDIX_ADMIN_API_KEY:}
+  pending-match:
+    enabled: ${PREDIX_PENDING_MATCH_ENABLED:true}
+    interval-ms: ${PREDIX_PENDING_MATCH_INTERVAL_MS:60000}
+    batch-size: ${PREDIX_PENDING_MATCH_BATCH_SIZE:50}
+  pending-cancel:
+    enabled: ${PREDIX_PENDING_CANCEL_ENABLED:true}
+    interval-ms: ${PREDIX_PENDING_CANCEL_INTERVAL_MS:60000}
+    batch-size: ${PREDIX_PENDING_CANCEL_BATCH_SIZE:50}
+  reconciliation:
+    enabled: ${MATCHING_RECONCILIATION_ENABLED:true}
+    interval-ms: ${MATCHING_RECONCILIATION_INTERVAL_MS:300000}
+    depth-levels: ${MATCHING_RECONCILIATION_DEPTH_LEVELS:20}
   clients:
     market-schema:
       base-url: ${MARKET_SCHEMA_URL:http://localhost:8081}

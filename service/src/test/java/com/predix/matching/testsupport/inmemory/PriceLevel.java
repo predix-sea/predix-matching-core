@@ -1,6 +1,6 @@
-package com.predix.matching.engine;
+package com.predix.matching.testsupport.inmemory;
 
-import com.predix.matching.engine.model.BookOrder;
+import com.predix.matching.testsupport.inmemory.model.BookOrder;
 
 import java.math.BigDecimal;
 import java.util.ArrayDeque;
@@ -13,10 +13,6 @@ class PriceLevel {
 
     PriceLevel(BigDecimal price) {
         this.price = price;
-    }
-
-    BigDecimal getPrice() {
-        return price;
     }
 
     void add(BookOrder order) {
@@ -39,17 +35,9 @@ class PriceLevel {
         return orders.isEmpty();
     }
 
-    int size() {
-        return orders.size();
-    }
-
     java.math.BigDecimal totalQuantity() {
         return orders.stream()
                 .map(BookOrder::getRemainingQuantity)
                 .reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add);
-    }
-
-    java.util.Iterator<BookOrder> iterator() {
-        return orders.iterator();
     }
 }

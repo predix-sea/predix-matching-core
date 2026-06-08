@@ -56,7 +56,7 @@ if(PREDIX_BUILD_TESTS)
     endif()
 
     enable_testing()
-    add_executable(matching_core_tests tests/order_book_test.cpp)
+    add_executable(matching_core_tests tests/order_book_test.cpp tests/wal_replay_test.cpp)
     target_include_directories(matching_core_tests PRIVATE
         "${CMAKE_CURRENT_SOURCE_DIR}/include")
     if(TARGET GTest::gtest)

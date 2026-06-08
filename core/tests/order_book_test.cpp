@@ -77,6 +77,31 @@ TEST_F(OrderBookTest, RestingLimitAddedWhenNoMatch) {
     EXPECT_FALSE(book.getDepth(5).empty());
 }
 
+TEST(OrderBookIdempotencyTest, DuplicateAddToBook_ignored) {
+    OrderBook book{"m", "yes"};
+    const std::string id = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
+    book.addToBook(limitOrder(id, Side::BUY, "0.40", "10", 1));
+    book.addToBook(limitOrder(id, Side::BUY, "0.40", "10", 2));
+    int buy_levels = 0;
+    for (const auto& d : book.getDepth(5)) {
+        if (d.side == Side::BUY) {
+            EXPECT_EQ(d.quantity, Decimal::parse("10"));
+            ++buy_levels;
+        }
+    }
+    EXPECT_EQ(buy_levels, 1);
+}
+
+TEST(OrderBookIdempotencyTest, SubmissionResultReplayed) {
+    OrderBook book{"m", "yes"};
+    book.addToBook(limitOrder("s1", Side::SELL, "0.50", "5", 1));
+    const auto first = book.match(limitOrder("b1", Side::BUY, "0.50", "5", 2));
+    book.recordSubmissionResult(first);
+    const auto replay = book.findSubmissionResult("b1");
+    ASSERT_TRUE(replay.has_value());
+    EXPECT_EQ(replay->fills.size(), 1u);
+}
+
 TEST(OrderBookCancelTest, RemoveFromBook_removesRestingOrder) {
     OrderBook book{"m", "yes"};
     const std::string id = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";

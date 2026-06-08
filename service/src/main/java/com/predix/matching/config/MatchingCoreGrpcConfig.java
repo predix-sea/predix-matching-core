@@ -3,11 +3,15 @@ package com.predix.matching.config;
 import com.predix.matching.config.PredixProperties;
 import com.predix.matching.grpc.MatchingCoreGrpc;
 import io.grpc.ManagedChannel;
-import io.grpc.ManagedChannelBuilder;
+import io.grpc.netty.shaded.io.grpc.netty.GrpcSslContexts;
+import io.grpc.netty.shaded.io.grpc.netty.NettyChannelBuilder;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+
+import java.io.File;
+import java.util.concurrent.TimeUnit;
 
 @Slf4j
 @Configuration
@@ -15,16 +19,32 @@ import org.springframework.context.annotation.Configuration;
 public class MatchingCoreGrpcConfig {
 
     @Bean(destroyMethod = "shutdown")
-    public ManagedChannel matchingCoreChannel(PredixProperties properties) {
+    public ManagedChannel matchingCoreChannel(PredixProperties properties) throws Exception {
         var grpc = properties.getMatchingCore().getGrpc();
-        log.info("Connecting to C++ matching core at {}:{}", grpc.getHost(), grpc.getPort());
-        return ManagedChannelBuilder.forAddress(grpc.getHost(), grpc.getPort())
+        log.info("Connecting to C++ matching core at {}:{} (tls={})", grpc.getHost(), grpc.getPort(), grpc.isTlsEnabled());
+
+        if (grpc.isTlsEnabled()) {
+            if (grpc.getTrustCertPath() == null || grpc.getTrustCertPath().isBlank()) {
+                throw new IllegalStateException("predix.matching-core.grpc.tls-enabled=true requires trust-cert-path");
+            }
+            var sslContext = GrpcSslContexts.forClient()
+                    .trustManager(new File(grpc.getTrustCertPath()))
+                    .build();
+            return NettyChannelBuilder.forAddress(grpc.getHost(), grpc.getPort())
+                    .sslContext(sslContext)
+                    .build();
+        }
+
+        return NettyChannelBuilder.forAddress(grpc.getHost(), grpc.getPort())
                 .usePlaintext()
                 .build();
     }
 
     @Bean
-    public MatchingCoreGrpc.MatchingCoreBlockingStub matchingCoreStub(ManagedChannel matchingCoreChannel) {
-        return MatchingCoreGrpc.newBlockingStub(matchingCoreChannel);
+    public MatchingCoreGrpc.MatchingCoreBlockingStub matchingCoreStub(
+            ManagedChannel matchingCoreChannel, PredixProperties properties) {
+        long deadlineMs = properties.getMatchingCore().getGrpc().getDeadlineMs();
+        return MatchingCoreGrpc.newBlockingStub(matchingCoreChannel)
+                .withDeadlineAfter(deadlineMs, TimeUnit.MILLISECONDS);
     }
 }

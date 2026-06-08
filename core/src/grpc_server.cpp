@@ -5,9 +5,25 @@
 
 #include <grpcpp/grpcpp.h>
 
+#include <fstream>
 #include <memory>
+#include <sstream>
 #include <stdexcept>
 #include <string>
+
+namespace {
+
+std::string readFile(const std::string& path) {
+    std::ifstream input(path);
+    if (!input.is_open()) {
+        throw std::runtime_error("failed to read TLS file: " + path);
+    }
+    std::ostringstream buffer;
+    buffer << input.rdbuf();
+    return buffer.str();
+}
+
+}  // namespace
 
 namespace predix::server {
 
@@ -130,9 +146,17 @@ public:
         for (const auto& in : request->orders()) {
             orders.push_back(toEngineOrder(in));
         }
-        const int loaded =
-            core_->warmupBook(request->market_id(), request->outcome_id(), std::move(orders));
+        const int loaded = core_->warmupBook(request->market_id(), request->outcome_id(),
+                                             std::move(orders), request->replace_existing());
         response->set_loaded_count(loaded);
+        return grpc::Status::OK;
+    }
+
+    grpc::Status ResetBook(grpc::ServerContext*,
+                           const predix::matching::ResetBookRequest* request,
+                           predix::matching::ResetBookResponse* response) override {
+        const bool reset = core_->resetBook(request->market_id(), request->outcome_id());
+        response->set_reset(reset);
         return grpc::Status::OK;
     }
 
@@ -170,7 +194,16 @@ GrpcServer::~GrpcServer() {
 void GrpcServer::start() {
     impl_->service = std::make_unique<MatchingCoreServiceImpl>(impl_->core);
     grpc::ServerBuilder builder;
-    builder.AddListeningPort(impl_->config.listen_address, grpc::InsecureServerCredentials());
+    if (!impl_->config.tls_cert_path.empty() && !impl_->config.tls_key_path.empty()) {
+        grpc::SslServerCredentialsOptions options;
+        options.pem_key_cert_pairs.push_back({
+            readFile(impl_->config.tls_key_path),
+            readFile(impl_->config.tls_cert_path),
+        });
+        builder.AddListeningPort(impl_->config.listen_address, grpc::SslServerCredentials(options));
+    } else {
+        builder.AddListeningPort(impl_->config.listen_address, grpc::InsecureServerCredentials());
+    }
     builder.RegisterService(impl_->service.get());
     impl_->server = builder.BuildAndStart();
     if (!impl_->server) {

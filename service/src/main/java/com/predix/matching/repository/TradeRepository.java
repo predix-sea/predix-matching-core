@@ -21,4 +21,8 @@ public interface TradeRepository extends JpaRepository<TradeEntity, UUID> {
             @Param("marketId") String marketId,
             @Param("outcomeId") String outcomeId,
             Pageable pageable);
+
+    boolean existsByBuyOrderIdAndSellOrderId(UUID buyOrderId, UUID sellOrderId);
+
+    java.util.Optional<TradeEntity> findFirstByBuyOrderIdAndSellOrderId(UUID buyOrderId, UUID sellOrderId);
 }

@@ -42,6 +42,7 @@ class OrderBookQueryH2Test extends H2IntegrationTestBase {
 
         OrderBookResponse book = orderBookService.getOrderBook("mkt-query", "yes");
         assertThat(book.getMarketId()).isEqualTo("mkt-query");
+        assertThat(book.getDepth()).isNotEmpty();
 
         List<DepthLevelResponse> depth = orderBookService.getDepth("mkt-query", "yes", 5);
         assertThat(depth).isNotEmpty();

@@ -5,7 +5,6 @@ import com.predix.matching.controller.dto.*;
 import com.predix.matching.domain.entity.ExecutionTaskEntity;
 import com.predix.matching.domain.entity.OrderEntity;
 import com.predix.matching.domain.entity.TradeEntity;
-import com.predix.matching.engine.InMemoryOrderBook;
 import org.springframework.data.domain.Page;
 import org.springframework.stereotype.Component;
 
@@ -77,14 +76,6 @@ public class DtoMapper {
                 .side(level.getSide())
                 .price(level.getPrice())
                 .quantity(level.getQuantity())
-                .build();
-    }
-
-    public DepthLevelResponse toDepth(InMemoryOrderBook.DepthLevel level) {
-        return DepthLevelResponse.builder()
-                .side(level.side())
-                .price(level.price())
-                .quantity(level.quantity())
                 .build();
     }
 

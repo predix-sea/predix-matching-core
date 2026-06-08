@@ -10,7 +10,8 @@ namespace predix::wal {
 
 class WalWriter {
 public:
-    explicit WalWriter(std::string path) : path_(std::move(path)) {
+    explicit WalWriter(std::string path, bool flush_each_append = false)
+        : path_(std::move(path)), flush_each_append_(flush_each_append) {
         out_.open(path_, std::ios::app);
     }
 
@@ -20,7 +21,16 @@ public:
             out_.open(path_, std::ios::app);
         }
         out_ << record << '\n';
-        out_.flush();
+        if (flush_each_append_) {
+            out_.flush();
+        }
+    }
+
+    void sync() {
+        std::lock_guard lock(mutex_);
+        if (out_.is_open()) {
+            out_.flush();
+        }
     }
 
     void appendSubmit(const std::string& market_id, const std::string& outcome_id,
@@ -42,6 +52,7 @@ private:
     std::string path_;
     std::ofstream out_;
     std::mutex mutex_;
+    bool flush_each_append_;
 };
 
 }  // namespace predix::wal
