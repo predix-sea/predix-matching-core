@@ -35,11 +35,13 @@ WORKDIR /app
 COPY --from=build /opt/runtime-libs/libstdc++.so.6 /usr/local/lib/libstdc++.so.6
 COPY --from=build /opt/runtime-libs/libgcc_s.so.1 /usr/local/lib/libgcc_s.so.1
 COPY --from=build /src/build/matching_core /app/matching_core
+COPY --from=build /src/proto/matching_core.proto /app/proto/matching_core.proto
 COPY config/core.yaml /app/config/core.yaml
 RUN mkdir -p /var/lib/predix
 ENV LD_LIBRARY_PATH=/usr/local/lib
 ENV PREDIX_CORE_CONFIG=/app/config/core.yaml
 EXPOSE 50051
 HEALTHCHECK --interval=5s --timeout=5s --retries=12 --start-period=10s \
-  CMD grpcurl -plaintext -d '{}' 127.0.0.1:50051 predix.matching.MatchingCore/Health | grep -q '"healthy": true'
+  CMD grpcurl -plaintext -import-path /app/proto -proto matching_core.proto -d '{}' \
+      127.0.0.1:50051 predix.matching.MatchingCore/Health | grep -qE '"healthy"[[:space:]]*:[[:space:]]*true'
 ENTRYPOINT ["/app/matching_core"]
