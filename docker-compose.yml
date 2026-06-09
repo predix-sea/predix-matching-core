@@ -48,14 +48,16 @@ services:
     volumes:
       - waldata:/var/lib/predix
     healthcheck:
-      test: ["CMD-SHELL", "grpcurl -plaintext -d '{}' 127.0.0.1:50051 predix.matching.MatchingCore/Health | grep -q '\"healthy\": true'"]
+      test: ["CMD-SHELL", "grpcurl -plaintext -import-path /app/proto -proto matching_core.proto -d '{}' 127.0.0.1:50051 predix.matching.MatchingCore/Health | grep -qE '\"healthy\"[[:space:]]*:[[:space:]]*true'"]
       interval: 5s
       timeout: 5s
       retries: 12
       start_period: 10s
 
   matching-service:
-    build: ./service
+    build:
+      context: .
+      dockerfile: service/Dockerfile
     ports:
       - "8082:8082"
     environment:

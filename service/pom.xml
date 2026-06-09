@@ -25,7 +25,10 @@
         <grpc.version>1.68.1</grpc.version>
         <protobuf.version>4.28.3</protobuf.version>
         <protoc.version>4.28.3</protoc.version>
-        <os.detected.classifier>osx-aarch_64</os.detected.classifier>
+        <proto.source.dir>${project.basedir}/../core/proto</proto.source.dir>
+        <proto.build.dir>${project.build.directory}/protos</proto.build.dir>
+        <protobuf.generated.java.dir>${project.build.directory}/generated-sources/protobuf/java</protobuf.generated.java.dir>
+        <protobuf.generated.grpc.dir>${project.build.directory}/generated-sources/protobuf/grpc-java</protobuf.generated.grpc.dir>
     </properties>
 
     <dependencies>
@@ -146,7 +149,38 @@
     </dependencies>
 
     <build>
+        <extensions>
+            <extension>
+                <groupId>kr.motd.maven</groupId>
+                <artifactId>os-maven-plugin</artifactId>
+                <version>1.7.1</version>
+            </extension>
+        </extensions>
         <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-resources-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>copy-proto-sources</id>
+                        <phase>generate-sources</phase>
+                        <goals>
+                            <goal>copy-resources</goal>
+                        </goals>
+                        <configuration>
+                            <outputDirectory>${proto.build.dir}</outputDirectory>
+                            <resources>
+                                <resource>
+                                    <directory>${proto.source.dir}</directory>
+                                    <includes>
+                                        <include>**/*.proto</include>
+                                    </includes>
+                                </resource>
+                            </resources>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
             <plugin>
                 <groupId>org.xolstice.maven.plugins</groupId>
                 <artifactId>protobuf-maven-plugin</artifactId>
@@ -155,10 +189,13 @@
                     <protocArtifact>com.google.protobuf:protoc:${protoc.version}:exe:${os.detected.classifier}</protocArtifact>
                     <pluginId>grpc-java</pluginId>
                     <pluginArtifact>io.grpc:protoc-gen-grpc-java:${grpc.version}:exe:${os.detected.classifier}</pluginArtifact>
-                    <protoSourceRoot>${project.basedir}/../core/proto</protoSourceRoot>
+                    <protoSourceRoot>${proto.build.dir}</protoSourceRoot>
+                    <clearOutputDirectory>false</clearOutputDirectory>
                 </configuration>
                 <executions>
                     <execution>
+                        <id>generate-grpc-sources</id>
+                        <phase>generate-sources</phase>
                         <goals>
                             <goal>compile</goal>
                             <goal>compile-custom</goal>
@@ -172,15 +209,15 @@
                 <version>3.6.0</version>
                 <executions>
                     <execution>
-                        <id>add-source</id>
-                        <phase>generate-sources</phase>
+                        <id>add-grpc-generated-sources</id>
+                        <phase>process-sources</phase>
                         <goals>
                             <goal>add-source</goal>
                         </goals>
                         <configuration>
                             <sources>
-                                <source>${project.build.directory}/generated-sources/protobuf/java</source>
-                                <source>${project.build.directory}/generated-sources/protobuf/grpc-java</source>
+                                <source>${protobuf.generated.java.dir}</source>
+                                <source>${protobuf.generated.grpc.dir}</source>
                             </sources>
                         </configuration>
                     </execution>
